@@ -1,23 +1,9 @@
 import React, { useState } from 'react';
-import { 
-  Building2, 
-  CheckCircle2, 
-  XCircle, 
-  RefreshCw, 
-  AlertCircle, 
-  ShieldCheck, 
-  UserCheck, 
-  ArrowRight, 
-  Clock, 
-  FileText,
-  BadgeCheck,
-  Zap,
-  Phone,
-  Shield,
-  Layers,
-  ArrowRightLeft
-} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowRight, Check, CheckCircle2, Clock, RefreshCw, X } from 'lucide-react';
 import { ReissueRequestItem } from '../types';
+import { formatDate, formatTime, inr, timeAgo } from '../lib/format';
+import { BerthGlyph, Button, CountUp, cx, EASE_OUT, EmptyState, Modal, PageHeader, Pill } from './ui';
 
 interface OperatorDashboardProps {
   reissues: ReissueRequestItem[];
@@ -27,16 +13,12 @@ interface OperatorDashboardProps {
   onReject: (transactionId: string, reason: string) => Promise<void>;
 }
 
-export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
-  reissues,
-  isLoading,
-  onRefresh,
-  onApprove,
-  onReject
-}) => {
+const REASONS = ['Name does not match the ID', "Inside the operator's cutoff", 'Coach cancelled or rescheduled'];
+
+export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({ reissues, isLoading, onRefresh, onApprove, onReject }) => {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectModalTx, setRejectModalTx] = useState<ReissueRequestItem | null>(null);
-  const [rejectReason, setRejectReason] = useState('Identity mismatch or carrier blackout window');
+  const [rejectReason, setRejectReason] = useState(REASONS[0]);
 
   const handleApprove = async (txId: string) => {
     setProcessingId(txId);
@@ -58,335 +40,240 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
     }
   };
 
-  const pendingRequests = reissues.filter((r) => r.status === 'REISSUE_PENDING');
-  const pastRequests = reissues.filter((r) => r.status !== 'REISSUE_PENDING');
+  const pending = reissues.filter((r) => r.status === 'REISSUE_PENDING');
+  const past = reissues.filter((r) => r.status !== 'REISSUE_PENDING');
+  const completed = past.filter((r) => r.status === 'COMPLETED');
+  const declined = past.filter((r) => r.status === 'REJECTED' || r.status === 'FAILED');
+  const refunded = completed.reduce((n, r) => n + Number(r.sellerRefundAmount || 0), 0);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
-              Operator GDS Dispatch Terminal
-            </span>
-            <span className="text-xs text-slate-400 font-mono">SWIFT-CARRIER-API</span>
+    <div className="mx-auto w-full max-w-[1320px] px-5 pb-12 pt-32 sm:px-8 sm:pt-36">
+      <PageHeader
+        kicker="Dispatch · SwiftBus Express"
+        title="Reissue queue."
+        lede="Check who comes off the manifest and who goes on. Approving cancels the old ticket, issues the new one and releases the seller's refund in one step."
+        actions={
+          <Button variant="ghost" onClick={onRefresh}>
+            <RefreshCw className={cx('h-4 w-4', isLoading && 'animate-spin')} />
+            Refresh queue
+          </Button>
+        }
+      />
+
+      {/* Shift summary */}
+      <div className="mt-8 grid grid-cols-2 overflow-hidden rounded-2xl border border-line bg-surface md:grid-cols-4">
+        {[
+          { label: 'Waiting for you', value: pending.length, accent: pending.length > 0 },
+          { label: 'Reissued', value: completed.length },
+          { label: 'Refunds released', value: refunded, prefix: '₹' },
+          { label: 'Declined', value: declined.length },
+        ].map((s, i) => (
+          <div key={s.label} className={cx('p-5 sm:p-6', i % 2 === 1 && 'border-l border-line', i >= 2 && 'border-t border-line md:border-t-0', i === 2 && 'md:border-l')}>
+            <p className="text-sm text-ink3">{s.label}</p>
+            <p className={cx('display-md mt-2 text-[2rem]', s.accent ? 'text-marigold' : 'text-ink')}>
+              <CountUp value={s.value} prefix={s.prefix} />
+            </p>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-            SwiftBus Express — Operations Portal
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+        <Pill tone="neutral">Price cap: face value</Pill>
+        <Pill tone="neutral">Transfers close 60 min before departure</Pill>
+        <Pill tone="neutral">Passenger reissue: supported</Pill>
+        <span className="self-center pl-1 text-ink3">Simulated operator endpoint</span>
+      </div>
+
+      {/* Queue */}
+      <section className="mt-14">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="display-md flex items-center gap-3 text-[1.625rem] text-ink">
+            Waiting for approval
+            <span className="num grid h-7 min-w-7 place-items-center rounded-full bg-marigold px-2 text-sm font-bold text-marigoldink">{pending.length}</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Authorized passenger reissuance, seat reassignment, and passenger manifest sync
-          </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onRefresh}
-            className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh Queue</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Operator Capability Spec (Section 25) */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-slate-800">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-1.5 max-w-xl">
-            <div className="text-xs text-emerald-400 font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <BadgeCheck className="w-4 h-4 text-emerald-400" />
-              <span>Carrier API Capability Matrix</span>
-            </div>
-            <h3 className="text-lg font-black">Authorized Passenger Reissue Gateway</h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Real bus GDS systems (Bitla, RedBus, Mantis) require carrier-authorized seat reassignments before boarding passes can be regenerated. This dashboard acts as the simulated carrier endpoint.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 text-xs font-mono w-full lg:w-auto">
-            <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700 text-center">
-              <span className="text-slate-400 block text-[10px] font-bold">SUPPORTS_RESALE</span>
-              <span className="text-emerald-400 font-black text-sm">TRUE</span>
-            </div>
-            <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700 text-center">
-              <span className="text-slate-400 block text-[10px] font-bold">PRICE_CAP</span>
-              <span className="text-emerald-400 font-black text-sm">FACE_VALUE</span>
-            </div>
-            <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700 text-center">
-              <span className="text-slate-400 block text-[10px] font-bold">MIN_WINDOW</span>
-              <span className="text-amber-400 font-black text-sm">60 MINS</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Pending Reissue Requests Queue (Section 7) */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-amber-600" />
-            <span>Pending Reissue Requests ({pendingRequests.length})</span>
-          </h3>
-          <span className="text-xs text-slate-500 font-medium">Requires operator sign-off</span>
-        </div>
-
-        {isLoading ? (
-          <div className="bg-white rounded-3xl p-12 text-center border border-slate-200">
-            <div className="animate-spin w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full mx-auto mb-3"></div>
-            <p className="text-sm font-bold text-slate-700">Loading carrier queue...</p>
-          </div>
-        ) : pendingRequests.length === 0 ? (
-          <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm">
-            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-            <p className="text-base font-black text-slate-900">Queue is Clear</p>
-            <p className="text-xs text-slate-500 mt-1">
-              No pending seat reissue requests right now. Purchase a resale ticket as Priya to simulate a pending request.
-            </p>
-          </div>
+        {isLoading && reissues.length === 0 ? (
+          <div className="skeleton h-72 rounded-2xl" />
+        ) : pending.length === 0 ? (
+          <EmptyState
+            icon={<CheckCircle2 className="h-10 w-10 text-accent" strokeWidth={1.25} />}
+            title="Queue is clear"
+            body="New transfer requests land here the moment a traveller claims a released berth."
+          />
         ) : (
-          <div className="space-y-4">
-            {pendingRequests.map((r) => (
-              <div
-                key={r.transactionId}
-                className="bg-white rounded-3xl p-6 sm:p-7 border border-amber-300 ring-2 ring-amber-400/20 shadow-lg shadow-amber-500/5 transition-all"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono font-black px-2.5 py-0.5 bg-amber-100 text-amber-900 rounded-md">
-                        Request #{r.transactionNumber}
-                      </span>
-                      <span className="text-xs text-slate-500 font-mono">Seat {r.seat.seatNumber} ({r.seat.seatType})</span>
-                    </div>
-                    <h4 className="text-lg font-black text-slate-900">
-                      Transfer Authorization: {r.bus.operatorName} ({r.bus.busNumber})
-                    </h4>
-                    <p className="text-xs text-slate-500">
-                      {r.bus.routeFrom} → {r.bus.routeTo} • Date: {r.bus.travelDate}
-                    </p>
-                  </div>
+          <div className="space-y-5">
+            <AnimatePresence initial={false}>
+              {pending.map((r) => {
+                const busy = processingId === r.transactionId;
+                return (
+                  <motion.article
+                    key={r.transactionId}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, height: 0, marginTop: 0, transition: { duration: 0.45, ease: EASE_OUT } }}
+                    transition={{ duration: 0.5, ease: EASE_OUT }}
+                    className="overflow-hidden rounded-2xl border border-marigold/60 bg-surface shadow-lift"
+                  >
+                    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span className="code text-sm font-semibold text-ink">#{r.transactionNumber}</span>
+                        <span className="text-sm text-ink2">
+                          {r.bus.routeFrom} to {r.bus.routeTo} · {formatDate(r.bus.travelDate)} · {formatTime(r.bus.departureTime)}
+                        </span>
+                        <span className="code text-xs text-ink3">{r.bus.busNumber}</span>
+                      </div>
+                      <Pill tone="marigold" dot>
+                        <Clock className="h-3 w-3" /> Waiting {timeAgo(r.createdAt)}
+                      </Pill>
+                    </header>
 
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200">
-                      Clearance Pending
-                    </span>
-                  </div>
-                </div>
+                    <div className="grid items-stretch gap-4 p-6 md:grid-cols-[1fr_auto_1fr]">
+                      <div className="rounded-xl border border-line p-5">
+                        <p className="kicker text-danger">Off the manifest</p>
+                        <p className="mt-4 text-xl font-semibold text-ink">{r.originalPassenger.name}</p>
+                        <dl className="mt-4 space-y-2 text-sm">
+                          <Row k="Ticket" v={<span className="code">{r.originalPassenger.ticketNumber}</span>} />
+                          <Row k="Berth" v={<span className="code">{r.seat.seatNumber}</span>} />
+                          <Row k="Fare paid" v={inr(r.fare)} />
+                          <Row k="Refund on approval" v={<span className="font-semibold text-accent">{inr(r.sellerRefundAmount)}</span>} />
+                        </dl>
+                      </div>
 
-                {/* Comparison Card: Original vs New Passenger (Section 7) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 py-5">
-                  {/* Original Passenger Card */}
-                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
-                      <span>Original Ticket Holder (To Invalidate)</span>
-                      <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded font-mono text-[10px]">CANCEL</span>
-                    </div>
-                    <div className="space-y-1.5 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 font-medium">Passenger Name:</span>
-                        <span className="font-bold text-slate-900">{r.originalPassenger.name}</span>
+                      <div className="flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2 text-ink3">
+                          <BerthGlyph className="h-7 w-12" state="relay" />
+                          <ArrowRight className="h-5 w-5 rotate-90 md:rotate-0" />
+                          <span className="code text-xs">{r.seat.seatNumber}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 font-medium">Current Ticket ID:</span>
-                        <span className="font-mono font-bold text-slate-700">{r.originalPassenger.ticketNumber}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 font-medium">Assigned Seat:</span>
-                        <span className="font-bold text-slate-900">{r.seat.seatNumber}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 font-medium">Original Fare:</span>
-                        <span className="font-bold text-slate-900">₹{r.fare}</span>
-                      </div>
-                      <div className="pt-2 border-t border-slate-200 flex justify-between text-emerald-700 font-bold">
-                        <span>Refund to Seller:</span>
-                        <span>₹{r.sellerRefundAmount}</span>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* New Passenger Card */}
-                  <div className="bg-emerald-50/70 p-5 rounded-2xl border border-emerald-200">
-                    <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-3 flex items-center justify-between">
-                      <span>New Passenger (To Reissue & Board)</span>
-                      <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded font-mono text-[10px]">VERIFIED BUYER</span>
-                    </div>
-                    <div className="space-y-1.5 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-emerald-700 font-medium">Passenger Name:</span>
-                        <span className="font-bold text-slate-900">{r.newPassenger.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-emerald-700 font-medium">Age & Gender:</span>
-                        <span className="font-bold text-slate-900">{r.newPassenger.age} yrs • {r.newPassenger.gender}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-emerald-700 font-medium">Contact Phone:</span>
-                        <span className="font-mono font-bold text-slate-900">{r.newPassenger.phone}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-emerald-700 font-medium">Government ID:</span>
-                        <span className="font-mono font-bold text-slate-900">{r.newPassenger.govIdType} ({r.newPassenger.govIdNumber})</span>
-                      </div>
-                      <div className="pt-2 border-t border-emerald-200 flex justify-between text-emerald-900 font-bold">
-                        <span>Amount Paid:</span>
-                        <span>₹{r.resalePrice} (Face Value)</span>
+                      <div className="rounded-xl border border-coach/40 bg-coach/[0.04] p-5 dark:border-accent/40">
+                        <p className="kicker text-accent">Onto the manifest</p>
+                        <p className="mt-4 text-xl font-semibold text-ink">{r.newPassenger.name}</p>
+                        <dl className="mt-4 space-y-2 text-sm">
+                          <Row k="Age · gender" v={`${r.newPassenger.age} · ${r.newPassenger.gender}`} />
+                          <Row k="Phone" v={<span className="code">{r.newPassenger.phone}</span>} />
+                          <Row k={r.newPassenger.govIdType} v={<span className="code">{r.newPassenger.govIdNumber}</span>} />
+                          <Row k="Paid, held" v={<span className="font-semibold text-ink">{inr(r.resalePrice)}</span>} />
+                        </dl>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Operator Actions */}
-                <div className="pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-xs text-slate-500">
-                    Clicking approve immediately cancels <span className="font-mono font-bold">{r.originalPassenger.ticketNumber}</span>, reissues to <span className="font-bold">{r.newPassenger.name}</span>, and initiates ₹{r.sellerRefundAmount} refund.
-                  </div>
-
-                  <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                    <button
-                      onClick={() => setRejectModalTx(r)}
-                      disabled={processingId === r.transactionId}
-                      className="flex-1 sm:flex-initial px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => handleApprove(r.transactionId)}
-                      disabled={processingId === r.transactionId}
-                      className="flex-1 sm:flex-initial px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/20 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {processingId === r.transactionId ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Reissuing Ticket...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Approve Reissue</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                    <footer className="flex flex-col gap-4 border-t border-line bg-surface2/50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="max-w-xl text-sm text-ink2">
+                        Approving cancels <span className="code text-ink">{r.originalPassenger.ticketNumber}</span>, reissues berth {r.seat.seatNumber} to{' '}
+                        <span className="font-semibold text-ink">{r.newPassenger.name}</span> and refunds {inr(r.sellerRefundAmount)}.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button variant="quiet" onClick={() => setRejectModalTx(r)} disabled={busy} className="text-danger hover:bg-danger/10 hover:text-danger">
+                          <X className="h-4 w-4" />
+                          Decline
+                        </Button>
+                        <Button onClick={() => handleApprove(r.transactionId)} loading={busy} magnetic>
+                          {!busy && <Check className="h-4 w-4" />}
+                          {busy ? 'Reissuing…' : 'Approve reissue'}
+                        </Button>
+                      </div>
+                    </footer>
+                  </motion.article>
+                );
+              })}
+            </AnimatePresence>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Completed & Historical Reissues */}
-      <div>
-        <h3 className="text-xl font-black text-slate-900 mb-4">
-          Processed Reissues & Historical Carrier Manifest ({pastRequests.length})
-        </h3>
-
-        {pastRequests.length === 0 ? (
-          <div className="bg-white rounded-3xl p-8 text-center border border-slate-200 text-slate-500 text-xs">
-            No completed reissues recorded yet.
-          </div>
+      {/* History */}
+      <section className="mt-16">
+        <h2 className="display-md mb-5 text-[1.625rem] text-ink">Manifest history</h2>
+        {past.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-linestrong px-6 py-10 text-center text-ink3">Processed transfers will be listed here.</p>
         ) : (
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
+          <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+            <div className="overflow-x-auto" data-lenis-prevent>
+              <table className="w-full min-w-[860px] text-left text-sm">
+                <thead className="border-b border-line bg-surface2/60 text-xs text-ink3">
                   <tr>
-                    <th className="py-4 px-4">Transaction</th>
-                    <th className="py-4 px-4">Seat / Route</th>
-                    <th className="py-4 px-4">Original Passenger</th>
-                    <th className="py-4 px-4">New Verified Passenger</th>
-                    <th className="py-4 px-4">New Ticket ID</th>
-                    <th className="py-4 px-4">Seller Refund</th>
-                    <th className="py-4 px-4">Manifest Status</th>
+                    {['Transfer', 'Berth and route', 'Came off', 'Went on', 'New ticket', 'Seller refund', 'Outcome'].map((h) => (
+                      <th key={h} className="px-5 py-3.5 font-medium">{h}</th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pastRequests.map((r) => (
-                    <tr key={r.transactionId} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-4 px-4 font-mono font-bold text-slate-900">
-                        #{r.transactionNumber}
+                <tbody className="divide-y divide-line">
+                  {past.map((r, i) => (
+                    <motion.tr
+                      key={r.transactionId}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: Math.min(i * 0.04, 0.3) }}
+                      className="transition-colors hover:bg-surface2/50"
+                    >
+                      <td className="code px-5 py-4 text-ink">#{r.transactionNumber}</td>
+                      <td className="px-5 py-4">
+                        <span className="code font-semibold text-ink">{r.seat.seatNumber}</span>
+                        <span className="block text-xs text-ink3">{r.bus.routeFrom} to {r.bus.routeTo}</span>
                       </td>
-                      <td className="py-4 px-4">
-                        <span className="font-black text-slate-900">Seat {r.seat.seatNumber}</span>
-                        <div className="text-slate-500 text-[11px]">{r.bus.routeFrom} → {r.bus.routeTo}</div>
+                      <td className="px-5 py-4">
+                        <span className="text-ink2">{r.originalPassenger.name}</span>
+                        <span className="code block text-xs text-ink3 line-through">{r.originalPassenger.ticketNumber}</span>
                       </td>
-                      <td className="py-4 px-4">
-                        <span className="text-slate-800 font-semibold">{r.originalPassenger.name}</span>
-                        <div className="text-rose-600 text-[10px] font-mono line-through">
-                          {r.originalPassenger.ticketNumber} (INVALIDATED)
-                        </div>
+                      <td className="px-5 py-4">
+                        <span className="font-semibold text-ink">{r.newPassenger.name}</span>
+                        <span className="code block text-xs text-ink3">{r.newPassenger.govIdNumber}</span>
                       </td>
-                      <td className="py-4 px-4">
-                        <span className="text-slate-900 font-bold">{r.newPassenger.name}</span>
-                        <div className="text-slate-500 text-[10px]">{r.newPassenger.govIdType} ({r.newPassenger.govIdNumber})</div>
+                      <td className="code px-5 py-4 text-accent">{r.newTicket ? r.newTicket.ticketNumber : '·'}</td>
+                      <td className="num px-5 py-4 font-semibold text-ink">{r.status === 'COMPLETED' ? inr(r.sellerRefundAmount) : '·'}</td>
+                      <td className="px-5 py-4">
+                        {r.status === 'COMPLETED' ? <Pill tone="coach">Reissued</Pill> : <Pill tone="danger">{r.status === 'REJECTED' ? 'Declined' : r.status.toLowerCase()}</Pill>}
                       </td>
-                      <td className="py-4 px-4 font-mono font-bold text-emerald-700">
-                        {r.newTicket ? r.newTicket.ticketNumber : '—'}
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="font-bold text-emerald-900">₹{r.sellerRefundAmount}</span>
-                        <div className="text-[10px] text-emerald-600 font-bold">COMPLETED</div>
-                      </td>
-                      <td className="py-4 px-4">
-                        {r.status === 'COMPLETED' ? (
-                          <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
-                            REISSUED ✓
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 text-[10px] font-bold">
-                            {r.status}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
+                    </motion.tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Reject Modal */}
-      {rejectModalTx && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 border border-slate-200 shadow-2xl">
-            <h3 className="text-xl font-black text-slate-900 mb-2">
-              Reject Reissue Request #{rejectModalTx.transactionNumber}?
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Rejecting will refund buyer payment immediately and restore the seller listing.
+      <Modal open={!!rejectModalTx} onClose={() => setRejectModalTx(null)} label="Decline transfer" size="sm">
+        {rejectModalTx && (
+          <div className="p-7">
+            <h2 className="display-md pr-8 text-[1.5rem] text-ink">Decline #{rejectModalTx.transactionNumber}?</h2>
+            <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink2">
+              {rejectModalTx.newPassenger.name}'s payment is returned straight away and the berth goes back on sale for {rejectModalTx.originalPassenger.name}.
             </p>
-
-            <label className="block text-xs font-bold text-slate-600 mb-1.5">
-              Carrier Rejection Reason
-            </label>
-            <input
-              type="text"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-rose-500 outline-none mb-5"
-            />
-
-            <div className="flex items-center justify-end gap-2.5">
-              <button
-                onClick={() => setRejectModalTx(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmReject}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black shadow-md shadow-rose-600/20"
-              >
-                Confirm Rejection
-              </button>
+            <p className="mt-6 text-sm font-medium text-ink2">Reason</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {REASONS.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRejectReason(r)}
+                  className={cx('rounded-full border px-3 py-1.5 text-[0.8125rem] transition-colors', rejectReason === r ? 'border-danger bg-danger/10 text-danger' : 'border-line text-ink2 hover:border-linestrong')}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            <input className="field mt-3" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} aria-label="Reason for declining" />
+            <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="quiet" onClick={() => setRejectModalTx(null)}>
+                Keep in queue
+              </Button>
+              <Button variant="danger" onClick={handleConfirmReject} loading={processingId === rejectModalTx.transactionId}>
+                Decline transfer
+              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 };
+
+const Row: React.FC<{ k: React.ReactNode; v: React.ReactNode }> = ({ k, v }) => (
+  <div className="flex justify-between gap-4">
+    <dt className="text-ink3">{k}</dt>
+    <dd className="text-right text-ink2">{v}</dd>
+  </div>
+);

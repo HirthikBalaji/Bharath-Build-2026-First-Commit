@@ -1,15 +1,36 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!--
+      DIRECTION CONTRACT (SeatRelay UI, 2026-09)
+      THESIS: The page is the coach. A sleeper coach's deck plan is the stage, and the one thing it shows is a named berth changing hands through the operator. Refuses the category default (red search form over deal cards) and the luxury default (cream paper, italic serif, gold).
+      OWN-WORLD: Coach deck plan drawn as a premium cabin configuration diagram. Porcelain ground, coach green fields, marigold as the reading-lamp and relay signal. Archivo in expanded widths for livery-style display, Archivo for UI, Martian Mono only for seat codes, PNRs and times. Berths, aisles, road lines and ticket perforations are the component vocabulary.
+      STORY: See one berth released, claimed, reissued and refunded. Believe the fare is exact and the manifest true. Find a seat or release one.
+      FIRST VIEWPORT: Left, kicker plus two line expanded headline, subline, Find a seat and Release my seat. Right, a manifest slip that reissues U12 live. Below, the full width upper deck with U12 lighting up. Pull cord hangs top right.
+      FORM: Grounded direction 5 (sleeper seat layout) fused with the horizontal rail staging for the relay chapters. Seed 98fe33d8.
+    -->
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SeatRelay — Face-Value Bus Ticket Resale Platform</title>
+    <meta name="description" content="SeatRelay lets you release a bus seat you can no longer use. A traveller on the same route takes it at the exact fare, the operator reissues it in their name, and your money comes back." />
+    <meta name="theme-color" content="#F3F4F0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#080E0C" media="(prefers-color-scheme: dark)" />
+    <title>SeatRelay · Your seat travels on</title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('seatrelay_theme');
+          var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.toggle('dark', dark);
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Martian+Mono:wdth,wght@75..112.5,300..700&display=swap" rel="stylesheet">
   </head>
-  <body class="bg-slate-50 text-slate-900 antialiased font-sans">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

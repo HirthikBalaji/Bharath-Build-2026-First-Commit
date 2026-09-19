@@ -1,70 +1,59 @@
-import React, { useState } from 'react';
-import { 
-  X, 
-  Lock, 
-  Mail, 
-  User as UserIcon, 
-  Phone, 
-  ShieldCheck, 
-  AlertCircle, 
-  ArrowRight,
-  Sparkles,
-  CheckCircle2
-} from 'lucide-react';
-import { Logo } from './Logo';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { User } from '../types';
+import { Logo } from './Logo';
+import { DeckPlan } from './DeckPlan';
+import { Button, cx, EASE_OUT, Modal, Segmented } from './ui';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (user: User, token: string) => void;
   initialMode?: 'login' | 'register';
+  prefillEmail?: string;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({
-  isOpen,
-  onClose,
-  onSuccess,
-  initialMode = 'login'
-}) => {
+const DEMO = [
+  { label: 'Rahul', role: 'Seller', email: 'rahul@example.com', password: 'rahul@123' },
+  { label: 'Priya', role: 'Buyer', email: 'priya@example.com', password: 'priya@123' },
+  { label: 'SwiftBus', role: 'Operator', email: 'ops@swiftbus.in', password: 'operator@123' },
+];
+
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess, initialMode = 'login', prefillEmail }) => {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<'buyer' | 'seller' | 'operator'>('buyer');
-  
+  const [showPw, setShowPw] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    setMode(initialMode);
+    setError(null);
+    if (prefillEmail) setEmail(prefillEmail);
+  }, [isOpen, initialMode, prefillEmail]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-
     try {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const body = mode === 'login' 
-        ? { email, password }
-        : { name, email, phone, role, password };
-
+      const body = mode === 'login' ? { email, password } : { name, email, phone, role, password };
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
-
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Authentication failed');
-      }
-
-      // Store JWT token in localStorage for persistence
+      if (!res.ok) throw new Error(data.error || 'Sign in failed. Check your email and password.');
       localStorage.setItem('seatrelay_token', data.token);
       localStorage.setItem('seatrelay_user', JSON.stringify(data.user));
-
       onSuccess(data.user, data.token);
       onClose();
     } catch (err: any) {
@@ -75,164 +64,147 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="bg-slate-900 text-white p-6 relative border-b border-slate-800">
-          <button
-            onClick={onClose}
-            className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          
-          <div className="flex items-center gap-3 mb-3">
-            <Logo size={36} />
-            <div>
-              <h2 className="text-xl font-black">Seat<span className="text-emerald-500">Relay</span></h2>
-              <p className="text-[11px] text-slate-400">Secure Passenger & Carrier Access</p>
-            </div>
+    <Modal open={isOpen} onClose={onClose} label={mode === 'login' ? 'Sign in' : 'Create account'} size="lg">
+      <div className="grid md:grid-cols-[0.9fr_1.1fr]">
+        <aside className="relative hidden flex-col justify-between overflow-hidden bg-coach p-8 text-coachink md:flex">
+          <Logo size={40} />
+          <div>
+            <h2 className="display text-[2.5rem]">Welcome aboard.</h2>
+            <p className="mt-3 text-coachink/75">Release a seat you can't use, or claim one someone else released. The operator puts the right name on it.</p>
+          </div>
+          <div className="-mx-2 opacity-90">
+            <DeckPlan phase="reissued" showOthers={false} />
+          </div>
+        </aside>
+
+        <div className="p-7 sm:p-9">
+          <div className="pr-8">
+            <Segmented
+              id="auth-mode"
+              value={mode}
+              onChange={(m) => {
+                setMode(m);
+                setError(null);
+              }}
+              options={[
+                { value: 'login', label: 'Sign in' },
+                { value: 'register', label: 'Create account' },
+              ]}
+            />
           </div>
 
-          <div className="flex items-center gap-2 mt-4 bg-slate-800/80 p-1 rounded-xl border border-slate-700 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => { setMode('login'); setError(null); }}
-              className={`flex-1 py-1.5 rounded-lg transition-all ${
-                mode === 'login'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('register'); setError(null); }}
-              className={`flex-1 py-1.5 rounded-lg transition-all ${
-                mode === 'register'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Register New Account
-            </button>
-          </div>
-        </div>
+          <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+            <AnimatePresence>
+              {error && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <div className="flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/5 p-3.5 text-sm text-danger" role="alert">
+                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    {error}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-600" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {mode === 'register' && (
-            <>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Full Legal Name</label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Ramesh Chandra"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Mobile Number (WhatsApp / SMS)</label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Account Category</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as any)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+            <AnimatePresence initial={false}>
+              {mode === 'register' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.4, ease: EASE_OUT }}
+                  className="space-y-4 overflow-hidden"
                 >
-                  <option value="buyer">Passenger / Ticket Buyer</option>
-                  <option value="seller">Ticket Holder / Seat Seller</option>
-                  <option value="operator">Bus Carrier Operations Agent</option>
-                </select>
+                  <label className="block pt-0.5">
+                    <span className="mb-1.5 block text-sm font-medium text-ink2">Full name, as on your ID</span>
+                    <input className="field" required value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-ink2">Mobile number</span>
+                    <input className="field" type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" autoComplete="tel" />
+                  </label>
+                  <div>
+                    <span className="mb-1.5 block text-sm font-medium text-ink2">I'm here to</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { v: 'buyer' as const, t: 'Find a seat' },
+                        { v: 'seller' as const, t: 'Release a seat' },
+                        { v: 'operator' as const, t: 'Run a fleet' },
+                      ].map((o) => (
+                        <button
+                          type="button"
+                          key={o.v}
+                          onClick={() => setRole(o.v)}
+                          aria-pressed={role === o.v}
+                          className={cx(
+                            'rounded-lg border px-2 py-2.5 text-sm font-medium transition-colors',
+                            role === o.v ? 'border-coach bg-coach text-coachink' : 'border-line text-ink2 hover:border-linestrong'
+                          )}
+                        >
+                          {o.t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-ink2">Email</span>
+              <input className="field" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-ink2">Password</span>
+              <span className="relative block">
+                <input
+                  className="field pr-11"
+                  type={showPw ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((s) => !s)}
+                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-ink3 hover:text-ink"
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                >
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </span>
+            </label>
+
+            <Button type="submit" size="lg" className="w-full" loading={isLoading}>
+              {mode === 'login' ? 'Sign in' : 'Create account'}
+            </Button>
+          </form>
+
+          {mode === 'login' && (
+            <div className="mt-8 border-t border-line pt-6">
+              <p className="text-sm font-medium text-ink2">Demo accounts</p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {DEMO.map((d) => (
+                  <button
+                    key={d.email}
+                    type="button"
+                    aria-label={`Use the ${d.label} demo account (${d.role})`}
+                    onClick={() => {
+                      setEmail(d.email);
+                      setPassword(d.password);
+                      setError(null);
+                    }}
+                    className={cx('rounded-lg border px-3 py-2.5 text-left transition-colors hover:border-linestrong', email === d.email ? 'border-coach dark:border-accent' : 'border-line')}
+                  >
+                    <span className="block text-sm font-semibold text-ink">{d.label}</span>
+                    <span className="block text-xs text-ink3">{d.role}</span>
+                  </button>
+                ))}
               </div>
-            </>
+            </div>
           )}
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Email Address</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
-          >
-            {isLoading ? (
-              <span>Authenticating...</span>
-            ) : mode === 'login' ? (
-              <>
-                <Lock className="w-4 h-4" />
-                <span>Sign In to Account</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Create Verified Account</span>
-              </>
-            )}
-          </button>
-
-          {/* Privacy and DPDP Badge */}
-          <div className="pt-2 text-center text-[10px] text-slate-400 flex items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>256-bit encrypted authentication • DPDP Act 2023 compliant</span>
-          </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </Modal>
   );
 };

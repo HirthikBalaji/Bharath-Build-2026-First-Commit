@@ -1,44 +1,52 @@
-import React, { useState } from 'react';
-import { 
-  Search, 
-  MapPin, 
-  Calendar, 
-  ArrowRight, 
-  ShieldCheck, 
-  Sparkles, 
-  CheckCircle2, 
-  AlertCircle, 
-  Layers, 
-  Clock, 
-  Ticket as TicketIcon,
-  Filter,
-  Info,
-  Zap,
-  Users
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeftRight, ArrowRight, CalendarDays, MapPin, Search, ShieldCheck, BusFront } from 'lucide-react';
 import { Bus, ResaleSeatSummary } from '../types';
+import { addDays, cityCode, duration, formatDate, formatTime, inr, seatTypeLabel } from '../lib/format';
+import { BerthGlyph, Button, cx, EASE_OUT, EmptyState, Pill, RevealText, Segmented } from './ui';
 
 interface SearchBusesProps {
   buses: Bus[];
   isLoading: boolean;
   onSearch: (from: string, to: string, date: string) => void;
   onSelectResaleSeat: (bus: Bus, seat: ResaleSeatSummary) => void;
+  initial?: { from: string; to: string; date: string };
 }
 
-export const SearchBuses: React.FC<SearchBusesProps> = ({
-  buses,
-  isLoading,
-  onSearch,
-  onSelectResaleSeat
-}) => {
-  const [fromCity, setFromCity] = useState('Bangalore');
-  const [toCity, setToCity] = useState('Chennai');
-  const [travelDate, setTravelDate] = useState('2026-09-19');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'resale_only' | 'direct_only'>('all');
+type Filter = 'all' | 'resale_only' | 'direct_only';
+
+export const SearchBuses: React.FC<SearchBusesProps> = ({ buses, isLoading, onSearch, onSelectResaleSeat, initial }) => {
+  const [fromCity, setFromCity] = useState(initial?.from ?? 'Bangalore');
+  const [toCity, setToCity] = useState(initial?.to ?? 'Chennai');
+  const [travelDate, setTravelDate] = useState(initial?.date ?? '2026-09-19');
+  const [query, setQuery] = useState({ from: fromCity, to: toCity, date: travelDate });
+  const [activeFilter, setActiveFilter] = useState<Filter>('all');
+  const [swapTurn, setSwapTurn] = useState(0);
+
+  useEffect(() => {
+    if (initial) {
+      setFromCity(initial.from);
+      setToCity(initial.to);
+      setTravelDate(initial.date);
+      setQuery(initial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial?.from, initial?.to, initial?.date]);
+
+  const run = (from = fromCity, to = toCity, date = travelDate) => {
+    setQuery({ from, to, date });
+    onSearch(from, to, date);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch(fromCity, toCity, travelDate);
+    run();
+  };
+
+  const swap = () => {
+    setSwapTurn((t) => t + 1);
+    setFromCity(toCity);
+    setToCity(fromCity);
   };
 
   const filteredBuses = buses.filter((bus) => {
@@ -47,272 +55,302 @@ export const SearchBuses: React.FC<SearchBusesProps> = ({
     return true;
   });
 
+  const relayTotal = buses.reduce((n, b) => n + (b.resaleAvailableCount || 0), 0);
+  const days = [-2, -1, 0, 1, 2, 3, 4].map((d) => addDays(query.date, d));
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-      {/* Search Header Form */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
-          <div>
-            <h2 className="text-xl font-black text-slate-900 flex items-center gap-2.5">
-              <Search className="w-5 h-5 text-emerald-600" />
-              <span>Search Bus Routes & Resale Inventory</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Direct carrier availability plus verified face-value seats released by travellers
-            </p>
-          </div>
-
-          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 font-bold font-mono">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Face-Value Protection Active</span>
-          </span>
-        </div>
-
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="relative">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
-              From City
-            </label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type="text"
-                value={fromCity}
-                onChange={(e) => setFromCity(e.target.value)}
-                placeholder="From City"
-                className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="relative">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
-              To City
-            </label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type="text"
-                value={toCity}
-                onChange={(e) => setToCity(e.target.value)}
-                placeholder="To City"
-                className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="relative">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
-              Travel Date
-            </label>
-            <div className="relative">
-              <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type="date"
-                value={travelDate}
-                onChange={(e) => setTravelDate(e.target.value)}
-                className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-end">
-            <button
-              type="submit"
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl text-sm shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 h-[44px] cursor-pointer"
-            >
-              <Search className="w-4 h-4 stroke-[3]" />
-              <span>Search Buses</span>
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Results Controls & Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="mx-auto w-full max-w-[1320px] px-5 pb-12 pt-32 sm:px-8 sm:pt-36">
+      {/* Route header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h3 className="text-xl font-black text-slate-900">
-            Available Buses ({filteredBuses.length})
-          </h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Routes for <span className="font-bold text-slate-800">{fromCity}</span> → <span className="font-bold text-slate-800">{toCity}</span> on {travelDate}
+          <p className="kicker text-accent">Find a seat</p>
+          <RevealText
+            key={`${query.from}-${query.to}`}
+            as="h1"
+            text={`${query.from} to ${query.to}`}
+            className="display mt-5 text-[clamp(2.4rem,6vw,4.75rem)] text-ink"
+            once
+          />
+          <p className="mt-4 max-w-xl text-[1.0625rem] text-ink2">
+            Every coach on {formatDate(query.date, { weekday: 'long', day: 'numeric', month: 'long' })}, including berths other travellers have released at the printed fare.
           </p>
         </div>
-
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm text-xs font-bold">
-          <button
-            onClick={() => setActiveFilter('all')}
-            className={`px-3 py-1.5 rounded-xl transition-all ${
-              activeFilter === 'all'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            All Buses
-          </button>
-          <button
-            onClick={() => setActiveFilter('resale_only')}
-            className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all ${
-              activeFilter === 'resale_only'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-emerald-700 hover:bg-emerald-50'
-            }`}
-          >
-            <span>♻️ Resale Seats Only</span>
-          </button>
-          <button
-            onClick={() => setActiveFilter('direct_only')}
-            className={`px-3 py-1.5 rounded-xl transition-all ${
-              activeFilter === 'direct_only'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            Direct Carrier
-          </button>
+        <div className="flex items-center gap-2 text-sm text-ink2">
+          <ShieldCheck className="h-4 w-4 text-accent" />
+          Face-value protection on every relayed seat
         </div>
       </div>
 
-      {/* Bus List */}
-      {isLoading ? (
-        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200 shadow-sm">
-          <div className="animate-spin w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-sm font-bold text-slate-800">Querying operator schedules & resale inventory...</p>
-          <p className="text-xs text-slate-400 mt-1">Checking live seat reservation locks</p>
+      {/* Search console */}
+      <form
+        onSubmit={handleSubmit}
+        className="mt-10 grid overflow-hidden rounded-2xl border border-line bg-surface shadow-lift lg:grid-cols-[1fr_auto_1fr_0.8fr_auto]"
+      >
+        <label className="group flex flex-col justify-center gap-1 border-b border-line px-5 py-4 lg:border-b-0 lg:border-r">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-ink3">
+            <MapPin className="h-3.5 w-3.5" /> From
+          </span>
+          <input
+            value={fromCity}
+            onChange={(e) => setFromCity(e.target.value)}
+            className="bg-transparent text-lg font-semibold text-ink outline-none placeholder:text-ink3"
+            placeholder="Leaving from"
+            aria-label="From city"
+          />
+        </label>
+        <div className="relative flex items-center justify-center lg:border-r lg:border-line lg:px-2">
+          <motion.button
+            type="button"
+            onClick={swap}
+            animate={{ rotate: swapTurn * 180 }}
+            transition={{ duration: 0.5, ease: EASE_OUT }}
+            aria-label="Swap cities"
+            className="absolute -top-5 right-5 z-10 grid h-10 w-10 place-items-center rounded-full border border-line bg-surface text-ink2 shadow-lift transition-colors hover:border-coach hover:text-ink lg:static"
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+          </motion.button>
         </div>
-      ) : filteredBuses.length === 0 ? (
-        <div className="bg-white rounded-3xl p-16 text-center border border-slate-200 shadow-sm">
-          <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-lg font-bold text-slate-800">No buses matching filter criteria</p>
-          <p className="text-xs text-slate-500 mt-1">Try switching the filter to "All Buses" or search Bangalore → Chennai on 19 Sep 2026.</p>
+        <label className="flex flex-col justify-center gap-1 border-b border-line px-5 py-4 lg:border-b-0 lg:border-r">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-ink3">
+            <MapPin className="h-3.5 w-3.5" /> To
+          </span>
+          <input
+            value={toCity}
+            onChange={(e) => setToCity(e.target.value)}
+            className="bg-transparent text-lg font-semibold text-ink outline-none placeholder:text-ink3"
+            placeholder="Going to"
+            aria-label="To city"
+          />
+        </label>
+        <label className="flex flex-col justify-center gap-1 border-b border-line px-5 py-4 lg:border-b-0 lg:border-r">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-ink3">
+            <CalendarDays className="h-3.5 w-3.5" /> Date
+          </span>
+          <input
+            type="date"
+            value={travelDate}
+            onChange={(e) => setTravelDate(e.target.value)}
+            className="bg-transparent text-lg font-semibold text-ink outline-none [color-scheme:inherit]"
+            aria-label="Travel date"
+          />
+        </label>
+        <div className="p-3">
+          <Button type="submit" size="lg" className="h-full min-h-[3.25rem] w-full px-7">
+            <Search className="h-[18px] w-[18px]" />
+            Search coaches
+          </Button>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredBuses.map((bus) => {
-            const hasResale = bus.resaleAvailableCount > 0;
-            const isSoldOut = bus.isSoldOut;
+      </form>
 
-            return (
-              <div 
-                key={bus.id}
-                className={`bg-white rounded-3xl p-6 border transition-all ${
-                  hasResale 
-                    ? 'border-emerald-300 ring-2 ring-emerald-400/30 shadow-lg shadow-emerald-600/5' 
-                    : 'border-slate-200 shadow-sm hover:border-slate-300'
-                }`}
-              >
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                  {/* Bus details */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <h4 className="text-xl font-black text-slate-900">{bus.operator}</h4>
-                      <span className="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-lg border border-slate-200">
-                        {bus.busNumber}
-                      </span>
-                      <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">
-                        {bus.busType}
-                      </span>
-                    </div>
+      {/* Date strip */}
+      <div className="mt-5 flex gap-2 overflow-x-auto pb-1" data-lenis-prevent>
+        {days.map((d) => {
+          const active = d === query.date;
+          return (
+            <button
+              key={d}
+              onClick={() => {
+                setTravelDate(d);
+                run(fromCity, toCity, d);
+              }}
+              className={cx(
+                'relative flex min-w-[78px] flex-col items-center rounded-xl border px-3 py-2 transition-colors',
+                active ? 'border-coach text-coachink' : 'border-line text-ink2 hover:border-linestrong hover:text-ink'
+              )}
+            >
+              {active && <motion.span layoutId="date-active" className="absolute inset-0 rounded-[11px] bg-coach" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+              <span className="relative text-[0.6875rem] font-medium uppercase tracking-wide opacity-80">{formatDate(d, { weekday: 'short' })}</span>
+              <span className="num relative text-lg font-bold">{formatDate(d, { day: 'numeric' })}</span>
+            </button>
+          );
+        })}
+      </div>
 
-                    {/* Schedule times */}
-                    <div className="flex items-center gap-6 mt-4">
-                      <div>
-                        <div className="text-xl font-black text-slate-900">
-                          {new Date(bus.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                        <div className="text-xs text-slate-500 font-semibold">{bus.routeFrom}</div>
-                      </div>
+      {/* Toolbar */}
+      <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-ink2">
+          <span className="num font-semibold text-ink">{filteredBuses.length}</span> {filteredBuses.length === 1 ? 'coach' : 'coaches'}
+          {relayTotal > 0 && (
+            <>
+              {' · '}
+              <span className="font-semibold text-ink">{relayTotal}</span> relayed {relayTotal === 1 ? 'berth' : 'berths'}
+            </>
+          )}
+        </p>
+        <Segmented
+          id="bus-filter"
+          value={activeFilter}
+          onChange={setActiveFilter}
+          options={[
+            { value: 'all', label: 'All coaches' },
+            { value: 'resale_only', label: <><BerthGlyph className="h-3 w-5" state="relay" />Relayed seats</> },
+            { value: 'direct_only', label: 'Open seats' },
+          ]}
+        />
+      </div>
 
-                      <div className="flex flex-col items-center px-2">
-                        <span className="text-[10px] text-slate-400 font-mono font-bold">8 hrs</span>
-                        <div className="w-20 h-0.5 bg-slate-200 relative my-1">
-                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute -top-[4px] right-0 ring-4 ring-emerald-100"></div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-xl font-black text-slate-900">
-                          {new Date(bus.arrivalTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                        <div className="text-xs text-slate-500 font-semibold">{bus.routeTo}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Status, Price, and Action */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 lg:border-l lg:border-slate-100 lg:pl-6">
-                    <div>
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">
-                        Original Fare
-                      </div>
-                      <div className="text-2xl font-black text-slate-900">
-                        ₹{bus.baseFare}
-                      </div>
-                      <div className="text-[10px] text-emerald-600 font-bold">
-                        Zero Markup Guaranteed
-                      </div>
-                    </div>
-
-                    {isSoldOut ? (
-                      <div className="flex flex-col gap-2.5 w-full sm:w-auto">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200 w-fit">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          <span>Sold Out</span>
-                        </span>
-
-                        {hasResale ? (
-                          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 shadow-inner">
-                            <div className="flex items-center gap-1.5 text-xs font-black text-emerald-900">
-                              <span className="text-base">♻️</span>
-                              <span>{bus.resaleAvailableCount} seat available through SeatRelay</span>
-                            </div>
-                            <p className="text-[11px] text-emerald-700 mt-0.5">
-                              Released by traveller at original price
-                            </p>
-
-                            <div className="mt-3 space-y-2">
-                              {bus.resaleSeats.map((resale) => (
-                                <button
-                                  key={resale.listingId}
-                                  onClick={() => onSelectResaleSeat(bus, resale)}
-                                  className="w-full flex items-center justify-between gap-3 bg-white hover:bg-emerald-600 hover:text-white px-3.5 py-2 rounded-xl border border-emerald-300 text-emerald-900 text-xs font-bold shadow-sm transition-all group cursor-pointer hover:scale-[1.02]"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="bg-emerald-100 text-emerald-800 group-hover:bg-emerald-700 group-hover:text-white px-1.5 py-0.5 rounded font-mono text-[10px]">
-                                      {resale.seatNumber}
-                                    </span>
-                                    <span>Seat {resale.seatNumber} ({resale.seatType})</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 font-black text-emerald-700 group-hover:text-white">
-                                    <span>₹{resale.resalePrice}</span>
-                                    <ArrowRight className="w-3.5 h-3.5" />
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-400">
-                            No passengers have released seats for this route yet.
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>{bus.availableDirect} Seats Available (Direct)</span>
-                        </span>
-                      </div>
-                    )}
-                  </div>
+      {/* Results */}
+      <div className="mt-6">
+        {isLoading ? (
+          <div className="space-y-4" aria-busy="true" aria-label="Loading coaches">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-2xl border border-line bg-surface p-6">
+                <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr_1fr_auto]">
+                  <div className="skeleton h-14" />
+                  <div className="skeleton h-14" />
+                  <div className="skeleton h-14" />
+                  <div className="skeleton h-14 w-32" />
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        ) : filteredBuses.length === 0 ? (
+          <EmptyState
+            icon={<BusFront className="h-10 w-10" strokeWidth={1.25} />}
+            title="No coaches match"
+            body={
+              <>
+                Try <button className="font-semibold text-accent underline-offset-4 hover:underline" onClick={() => setActiveFilter('all')}>all coaches</button>, or search Bangalore to Chennai on 19 September to see the demo route.
+              </>
+            }
+          />
+        ) : (
+          <ul className="space-y-4">
+            <AnimatePresence initial={true}>
+              {filteredBuses.map((bus, i) => (
+                <motion.li
+                  key={bus.id}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.6, delay: Math.min(i * 0.07, 0.35), ease: EASE_OUT }}
+                >
+                  <CoachRow bus={bus} onSelect={onSelectResaleSeat} />
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ul>
+        )}
+      </div>
     </div>
+  );
+};
+
+const Occupancy: React.FC<{ bus: Bus }> = ({ bus }) => {
+  const total = Math.min(bus.totalSeats || 0, 40);
+  const relay = bus.resaleAvailableCount || 0;
+  const open = bus.availableDirect || 0;
+  const cells = Array.from({ length: total }, (_, i) => (i < relay ? 'relay' : i < relay + open ? 'open' : 'booked'));
+  return (
+    <div>
+      <div className="flex flex-wrap gap-[3px]" aria-label={`${open} open, ${relay} relayed, of ${bus.totalSeats} seats`}>
+        {cells.map((c, i) => (
+          <span
+            key={i}
+            className={cx(
+              'h-3 w-2 rounded-[2px]',
+              c === 'relay' ? 'bg-marigold' : c === 'open' ? 'border border-accent' : 'bg-linestrong/70'
+            )}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-ink3">
+        {open} open · {relay} relayed · {bus.totalSeats} berths
+      </p>
+    </div>
+  );
+};
+
+const CoachRow: React.FC<{ bus: Bus; onSelect: (bus: Bus, seat: ResaleSeatSummary) => void }> = ({ bus, onSelect }) => {
+  const hasResale = bus.resaleAvailableCount > 0;
+  return (
+    <article
+      className={cx(
+        'overflow-hidden rounded-2xl border bg-surface transition-shadow duration-300 hover:shadow-lift',
+        hasResale ? 'border-marigold/60' : 'border-line'
+      )}
+    >
+      <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.25fr_1.1fr_0.9fr_auto] lg:items-center">
+        {/* times */}
+        <div className="flex items-center gap-4">
+          <div>
+            <p className="num text-2xl font-bold text-ink">{formatTime(bus.departureTime)}</p>
+            <p className="code text-xs text-ink3">{cityCode(bus.routeFrom)}</p>
+          </div>
+          <div className="flex flex-1 flex-col items-center px-1">
+            <span className="text-xs text-ink3">{duration(bus.departureTime, bus.arrivalTime)}</span>
+            <span className="relative my-1.5 h-px w-full bg-linestrong">
+              <span className="absolute -top-[3px] left-0 h-[7px] w-[7px] rounded-full border border-linestrong bg-surface" />
+              <span className="absolute -top-[3px] right-0 h-[7px] w-[7px] rounded-full bg-ink3" />
+            </span>
+            <span className="text-xs text-ink3">Overnight</span>
+          </div>
+          <div className="text-right">
+            <p className="num text-2xl font-bold text-ink">{formatTime(bus.arrivalTime)}</p>
+            <p className="code text-xs text-ink3">{cityCode(bus.routeTo)}</p>
+          </div>
+        </div>
+
+        {/* operator */}
+        <div>
+          <p className="text-lg font-semibold text-ink">{bus.operator}</p>
+          <p className="text-sm text-ink2">{bus.busType}</p>
+          <p className="code mt-1 text-xs text-ink3">{bus.busNumber}</p>
+        </div>
+
+        <Occupancy bus={bus} />
+
+        {/* fare and state */}
+        <div className="flex items-center justify-between gap-4 lg:flex-col lg:items-end">
+          <div className="lg:text-right">
+            <p className="text-xs text-ink3">Printed fare</p>
+            <p className="num text-2xl font-bold text-ink">{inr(bus.baseFare)}</p>
+          </div>
+          {bus.isSoldOut ? <Pill tone="danger">Sold out</Pill> : <Pill tone="coach">{bus.availableDirect} open</Pill>}
+        </div>
+      </div>
+
+      {bus.isSoldOut &&
+        (hasResale ? (
+          <div className="border-t border-marigold/40 bg-marigold/[0.09] px-5 py-4 sm:px-6">
+            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-marigold opacity-70" />
+                <span className="relative h-2 w-2 rounded-full bg-marigold" />
+              </span>
+              Released by a traveller, reissued in your name by {bus.operator}
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {bus.resaleSeats.map((seat) => (
+                <motion.button
+                  key={seat.listingId}
+                  onClick={() => onSelect(bus, seat)}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="group flex items-stretch overflow-hidden rounded-xl border border-marigold/50 bg-surface text-left shadow-lift transition-colors hover:border-marigold"
+                >
+                  <div className="flex flex-1 items-center gap-3 px-4 py-3">
+                    <BerthGlyph className="h-6 w-11" state="relay" />
+                    <div>
+                      <p className="code text-sm font-semibold text-ink">{seat.seatNumber}</p>
+                      <p className="text-xs text-ink3">{seatTypeLabel(seat.seatType)}</p>
+                    </div>
+                  </div>
+                  <div className="perforation w-3" style={{ backgroundSize: '8px 12px', backgroundRepeat: 'repeat-y' }} />
+                  <div className="flex items-center gap-2 bg-marigold px-4 text-marigoldink">
+                    <div className="text-right">
+                      <p className="num text-base font-bold leading-tight">{inr(seat.resalePrice)}</p>
+                      <p className="text-[0.6875rem] font-medium opacity-75">exact fare</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="border-t border-line px-5 py-3 text-sm text-ink3 sm:px-6">Sold out. Nobody has released a berth on this coach yet.</p>
+        ))}
+    </article>
   );
 };

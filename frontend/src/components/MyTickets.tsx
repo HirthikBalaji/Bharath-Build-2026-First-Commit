@@ -1,19 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  Ticket as TicketIcon, 
-  ArrowRightLeft, 
-  CheckCircle2, 
-  AlertCircle, 
-  QrCode, 
-  Clock, 
-  MapPin, 
-  IndianRupee, 
-  ShieldCheck, 
-  Calendar,
-  XCircle,
-  RefreshCw
-} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowRight, QrCode, RefreshCw, Ticket as TicketIcon, Undo2, AlertCircle, Check } from 'lucide-react';
 import { Ticket, User } from '../types';
+import { cityCode, duration, formatDate, formatTime, inr, seatTypeLabel } from '../lib/format';
+import { useToast } from '../lib/toast';
+import { BerthGlyph, Button, cx, EASE_OUT, EmptyState, Modal, PageHeader, Pill } from './ui';
 
 interface MyTicketsProps {
   currentUser: User;
@@ -23,14 +14,21 @@ interface MyTicketsProps {
   onViewQR: (ticket: Ticket) => void;
 }
 
-export const MyTickets: React.FC<MyTicketsProps> = ({
-  currentUser,
-  tickets,
-  isLoading,
-  onRefresh,
-  onViewQR
-}) => {
-  const [listingModalTicket, setListingModalTicket] = useState<Ticket | null>(null);
+const STAGES = ['Released', 'Claimed', 'Reissued', 'Refunded'];
+
+const stageOf = (t: Ticket) => {
+  const l = t.activeListing;
+  if (t.status === 'INVALIDATED' || l?.status === 'COMPLETED') return 4;
+  if (!l) return 0;
+  if (l.status === 'PURCHASED') return 2;
+  if (l.status === 'LISTED') return 1;
+  return 1;
+};
+
+export const MyTickets: React.FC<MyTicketsProps> = ({ currentUser, tickets, isLoading, onRefresh, onViewQR }) => {
+  const { notify } = useToast();
+  const [releaseTicket, setReleaseTicket] = useState<Ticket | null>(null);
+  const [withdrawTicket, setWithdrawTicket] = useState<Ticket | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -41,12 +39,12 @@ export const MyTickets: React.FC<MyTicketsProps> = ({
       const res = await fetch(`/api/tickets/${ticket.id}/list`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sellerId: currentUser.id })
+        body: JSON.stringify({ sellerId: currentUser.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to list seat');
-
-      setListingModalTicket(null);
+      if (!res.ok) throw new Error(data.error || 'We could not release this seat.');
+      setReleaseTicket(null);
+      notify({ tone: 'success', title: `Berth ${ticket.seatNumber} released`, body: 'Travellers on this route can now claim it at the printed fare.' });
       onRefresh();
     } catch (err: any) {
       setActionError(err.message);
@@ -55,337 +53,312 @@ export const MyTickets: React.FC<MyTicketsProps> = ({
     }
   };
 
-  const handleCancelListing = async (listingId: string) => {
-    if (!confirm('Are you sure you want to cancel this resale listing?')) return;
+  const handleCancelListing = async (ticket: Ticket) => {
+    const listingId = ticket.activeListing?.id;
+    if (!listingId) return;
+    setIsSubmitting(true);
     try {
       const res = await fetch(`/api/resale/${listingId}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sellerId: currentUser.id })
+        body: JSON.stringify({ sellerId: currentUser.id }),
       });
       if (!res.ok) {
-        const d = await res.json();
-        alert(d.error || 'Failed to cancel listing');
-      } else {
-        onRefresh();
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'We could not withdraw this listing.');
       }
+      setWithdrawTicket(null);
+      notify({ tone: 'info', title: 'Listing withdrawn', body: `Berth ${ticket.seatNumber} is yours again. Board as usual.` });
+      onRefresh();
     } catch (err: any) {
-      alert(err.message);
+      notify({ tone: 'error', title: 'Could not withdraw', body: err.message });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">
-            My Bookings & Resales
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Logged in as <span className="font-semibold text-slate-800">{currentUser.name}</span> ({currentUser.email})
-          </p>
-        </div>
+  const first = currentUser.name.split(' ')[0];
 
-        <button
-          onClick={onRefresh}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh</span>
-        </button>
+  return (
+    <div className="mx-auto w-full max-w-[1320px] px-5 pb-12 pt-32 sm:px-8 sm:pt-36">
+      <PageHeader
+        kicker="My journeys"
+        title={`Your journeys, ${first}.`}
+        lede="Tickets in your name, and any seat you've released. Refunds land here the moment the operator reissues."
+        actions={
+          <Button variant="ghost" onClick={onRefresh}>
+            <RefreshCw className={cx('h-4 w-4', isLoading && 'animate-spin')} />
+            Refresh
+          </Button>
+        }
+      />
+
+      <div className="mt-10">
+        {isLoading && tickets.length === 0 ? (
+          <div className="space-y-5">
+            {[0, 1].map((i) => (
+              <div key={i} className="skeleton h-56 rounded-2xl" />
+            ))}
+          </div>
+        ) : tickets.length === 0 ? (
+          <EmptyState
+            icon={<TicketIcon className="h-10 w-10" strokeWidth={1.25} />}
+            title="No journeys yet"
+            body="Tickets booked in your name show up here. If you just claimed a relayed seat, it appears once the operator reissues it."
+          />
+        ) : (
+          <div className="space-y-6">
+            {tickets.map((t, i) => (
+              <motion.div
+                key={t.id}
+                initial={{ opacity: 0, y: 28 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: Math.min(i * 0.08, 0.4), ease: EASE_OUT }}
+              >
+                <JourneyCard
+                  ticket={t}
+                  onRelease={() => {
+                    setActionError(null);
+                    setReleaseTicket(t);
+                  }}
+                  onWithdraw={() => setWithdrawTicket(t)}
+                  onViewQR={() => onViewQR(t)}
+                />
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {isLoading ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
-          <div className="animate-spin w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full mx-auto mb-3"></div>
-          <p className="text-sm font-medium text-slate-600">Loading your tickets...</p>
-        </div>
-      ) : tickets.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
-          <TicketIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-slate-800">No Tickets Found</h3>
-          <p className="text-xs text-slate-500 mt-1">
-            You don't have any booked tickets on this profile yet.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {tickets.map((ticket) => {
-            const isConfirmed = ticket.status === 'CONFIRMED';
-            const isListed = ticket.status === 'LISTED_FOR_RESALE';
-            const isInvalidated = ticket.status === 'INVALIDATED';
-            const activeListing = ticket.activeListing;
-            const isResaleCompleted = activeListing && activeListing.status === 'COMPLETED';
+      {/* Release confirmation */}
+      <Modal open={!!releaseTicket} onClose={() => !isSubmitting && setReleaseTicket(null)} label="Release this seat" size="md">
+        {releaseTicket && (
+          <div className="p-7 sm:p-9">
+            <BerthGlyph className="h-9 w-16" state="relay" />
+            <h2 className="display-md mt-6 pr-8 text-[1.875rem] text-ink">Release berth {releaseTicket.seatNumber}?</h2>
+            <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink2">
+              It goes on sale at the printed fare to travellers on {releaseTicket.routeFrom} to {releaseTicket.routeTo}. Your ticket stays valid for you until someone buys it.
+            </p>
 
-            return (
-              <div
-                key={ticket.id}
-                className={`bg-white rounded-3xl p-6 border transition-all ${
-                  isInvalidated
-                    ? 'border-slate-200 bg-slate-50/70 opacity-80'
-                    : isListed
-                    ? 'border-amber-300 ring-1 ring-amber-400/30 shadow-md shadow-amber-500/5'
-                    : 'border-slate-200 shadow-sm'
-                }`}
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-                  {/* Operator & Ticket Number */}
-                  <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-sm">
-                      SB
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-bold text-slate-900">{ticket.operatorName}</h3>
-                        <span className="text-xs font-mono font-bold bg-slate-100 px-2 py-0.5 rounded text-slate-700">
-                          #{ticket.ticketNumber}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500">{ticket.busType} • {ticket.busNumber}</p>
-                    </div>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div>
-                    {isConfirmed && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Confirmed Booking</span>
-                      </span>
-                    )}
-                    {isListed && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                        <Clock className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Listed for Resale</span>
-                      </span>
-                    )}
-                    {isInvalidated && (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                        <span>Ticket Invalidated (Reissued)</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Journey & Passenger Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 py-5">
-                  <div>
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                      Route & Date
-                    </span>
-                    <p className="text-base font-bold text-slate-900">
-                      {ticket.routeFrom} → {ticket.routeTo}
-                    </p>
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      {ticket.travelDate} at {new Date(ticket.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                      Passenger & Seat
-                    </span>
-                    <p className="text-base font-bold text-slate-900">
-                      Seat {ticket.seatNumber} <span className="text-xs text-slate-500 font-normal">({ticket.seatType})</span>
-                    </p>
-                    <p className="text-xs text-slate-600 mt-0.5">
-                      {ticket.passengerName} ({ticket.passengerGender}, {ticket.passengerAge} yrs)
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                      Original Fare
-                    </span>
-                    <p className="text-2xl font-bold text-slate-900">
-                      ₹{ticket.fare}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Resale Info Panel if listed or completed */}
-                {activeListing && (
-                  <div className="mt-2 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                      <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                        <ArrowRightLeft className="w-4 h-4 text-emerald-600" />
-                        <span>Resale Listing #{activeListing.listingNumber}</span>
-                      </span>
-                      <span className="font-semibold text-slate-600">
-                        Status: <span className="uppercase text-emerald-700 font-bold">{activeListing.status}</span>
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-slate-600">
-                      <div>Original Fare: <span className="font-bold text-slate-900">₹{activeListing.originalPrice}</span></div>
-                      <div>Resold For: <span className="font-bold text-slate-900">₹{activeListing.resalePrice}</span></div>
-                      <div>Platform Fee: <span className="font-bold text-emerald-600">₹{activeListing.platformFee}</span></div>
-                      <div>Expected Refund: <span className="font-bold text-emerald-700">₹{activeListing.expectedRefund}</span></div>
-                    </div>
-
-                    {/* Refund Tracking */}
-                    {activeListing.transactions && activeListing.transactions.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-slate-200">
-                        {activeListing.transactions.map((tx: any) => (
-                          <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-slate-700 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100">
-                            <div>
-                              <span className="font-bold text-emerald-900">Resale Completed ✓</span>
-                              <span className="text-slate-500 ml-2">Transaction #{tx.transactionNumber}</span>
-                            </div>
-                            <div className="font-medium text-emerald-800">
-                              Refund: <span className="font-bold text-emerald-900">₹{tx.sellerRefundAmount}</span> • Status: <span className="font-bold text-emerald-700">COMPLETED</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    {ticket.qrCode && !isInvalidated && (
-                      <button
-                        onClick={() => onViewQR(ticket)}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer"
-                      >
-                        <QrCode className="w-4 h-4" />
-                        <span>View Digital Boarding Ticket</span>
-                      </button>
-                    )}
-                    {isInvalidated && (
-                      <span className="text-xs text-rose-600 font-semibold flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        <span>Original ticket invalidated upon reissue. Not valid for boarding.</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <div>
-                    {isConfirmed && (
-                      <button
-                        onClick={() => setListingModalTicket(ticket)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/10 transition-all cursor-pointer"
-                      >
-                        <ArrowRightLeft className="w-4 h-4" />
-                        <span>Release Seat for Resale</span>
-                      </button>
-                    )}
-
-                    {isListed && activeListing && (
-                      <button
-                        onClick={() => handleCancelListing(activeListing.id)}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        <span>Cancel Resale Listing</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+            {actionError && (
+              <div className="mt-5 flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger" role="alert">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                {actionError}
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
 
-      {/* Release Seat Confirmation Modal (Section 4 Seller Flow) */}
-      {listingModalTicket && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-slate-900 mb-1">
-                Release this seat for resale?
-              </h3>
-              <p className="text-xs text-slate-500 mb-4">
-                List your ticket on SeatRelay's face-value exchange so other travellers can book it.
-              </p>
-
-              {actionError && (
-                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>{actionError}</span>
+            <div className="mt-7 space-y-4 rounded-xl border border-line p-5">
+              <div>
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-medium text-ink">Cancel with the operator now</p>
+                  <p className="num text-xl font-bold text-danger">₹0</p>
                 </div>
-              )}
-
-              {/* Summary Card */}
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2 text-xs mb-4">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Route:</span>
-                  <span className="font-bold text-slate-800">{listingModalTicket.routeFrom} → {listingModalTicket.routeTo}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Date & Departure:</span>
-                  <span className="font-bold text-slate-800">{listingModalTicket.travelDate}, {new Date(listingModalTicket.departureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Seat:</span>
-                  <span className="font-bold text-slate-800">{listingModalTicket.seatNumber} ({listingModalTicket.seatType})</span>
-                </div>
-                <div className="pt-2 border-t border-slate-200 flex justify-between">
-                  <span className="text-slate-500">Original Fare:</span>
-                  <span className="font-bold text-slate-900">₹{listingModalTicket.fare}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Platform Fee:</span>
-                  <span className="font-bold text-emerald-600">₹0</span>
-                </div>
-                <div className="pt-2 border-t border-slate-200 flex justify-between text-sm font-bold">
-                  <span className="text-slate-900">Expected Refund:</span>
-                  <span className="text-emerald-700">₹{listingModalTicket.fare}</span>
-                </div>
+                <div className="mt-2 h-2 rounded-full bg-surface2" />
               </div>
-
-              {/* Specification Comparison Callout (Section 11) */}
-              <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5 text-xs text-amber-950 mb-4 space-y-1">
-                <div className="font-bold flex items-center justify-between">
-                  <span>Standard Operator Cancellation:</span>
-                  <span className="text-rose-600 font-black">₹0 back (100% loss)</span>
+              <div>
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-medium text-ink">Release on SeatRelay</p>
+                  <p className="num text-xl font-bold text-accent">{inr(releaseTicket.fare)}</p>
                 </div>
-                <div className="font-bold flex items-center justify-between text-emerald-800">
-                  <span>Release on SeatRelay Protocol:</span>
-                  <span className="text-emerald-700 font-black">₹{listingModalTicket.fare} back if it sells</span>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface2">
+                  <motion.div className="h-full origin-left rounded-full bg-coach dark:bg-accent" initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 1, delay: 0.3, ease: EASE_OUT }} />
                 </div>
-              </div>
-
-              {/* Explanation Quote from spec */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 text-xs text-emerald-900 mb-6 leading-relaxed">
-                <p className="font-bold mb-1">Important Protection Terms:</p>
-                <p>
-                  "Your ticket will remain valid for you until another traveller purchases it. Once the operator reissues the seat to the buyer, your original ticket will be cancelled and your refund will be initiated."
-                </p>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setListingModalTicket(null)}
-                  disabled={isSubmitting}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleListTicket(listingModalTicket)}
-                  disabled={isSubmitting}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  {isSubmitting ? (
-                    <span>Listing...</span>
-                  ) : (
-                    <span>List for ₹{listingModalTicket.fare}</span>
-                  )}
-                </button>
+                <p className="mt-2 text-xs text-ink3">Paid back once the operator reissues the seat. SeatRelay fee ₹0.</p>
               </div>
             </div>
+
+            <div className="mt-8 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="quiet" onClick={() => setReleaseTicket(null)} disabled={isSubmitting}>
+                Keep my seat
+              </Button>
+              <Button onClick={() => handleListTicket(releaseTicket)} loading={isSubmitting}>
+                Release for {inr(releaseTicket.fare)}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Withdraw confirmation */}
+      <Modal open={!!withdrawTicket} onClose={() => !isSubmitting && setWithdrawTicket(null)} label="Withdraw listing" size="sm">
+        {withdrawTicket && (
+          <div className="p-7">
+            <h2 className="display-md pr-8 text-[1.5rem] text-ink">Take berth {withdrawTicket.seatNumber} off sale?</h2>
+            <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink2">Nobody will be able to claim it. Your ticket stays exactly as it was.</p>
+            <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="quiet" onClick={() => setWithdrawTicket(null)} disabled={isSubmitting}>
+                Keep it listed
+              </Button>
+              <Button variant="danger" onClick={() => handleCancelListing(withdrawTicket)} loading={isSubmitting}>
+                Withdraw listing
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+const JourneyCard: React.FC<{ ticket: Ticket; onRelease: () => void; onWithdraw: () => void; onViewQR: () => void }> = ({
+  ticket: t,
+  onRelease,
+  onWithdraw,
+  onViewQR,
+}) => {
+  const listed = t.status === 'LISTED_FOR_RESALE';
+  const invalid = t.status === 'INVALIDATED';
+  const confirmed = t.status === 'CONFIRMED';
+  const reissuedToMe = t.ticketNumber?.startsWith('SR-');
+  const stage = stageOf(t);
+  const tx = t.activeListing?.transactions?.[0];
+  const refund = tx?.sellerRefundAmount ?? t.activeListing?.expectedRefund ?? t.fare;
+
+  const status = invalid ? (
+    <Pill tone="neutral">Transferred</Pill>
+  ) : listed ? (
+    <Pill tone="marigold" dot>
+      {stage === 2 ? 'Claimed, awaiting operator' : 'Released, waiting for a buyer'}
+    </Pill>
+  ) : confirmed ? (
+    <Pill tone="coach">{reissuedToMe ? 'Reissued to you' : 'Confirmed'}</Pill>
+  ) : (
+    <Pill tone="neutral">{t.status.replace(/_/g, ' ').toLowerCase()}</Pill>
+  );
+
+  return (
+    <article className={cx('overflow-hidden rounded-2xl border bg-surface transition-shadow hover:shadow-lift', listed ? 'border-marigold/60' : 'border-line', invalid && 'bg-surface/70')}>
+      <div className="grid lg:grid-cols-[1fr_auto_220px]">
+        {/* main */}
+        <div className="p-6 sm:p-8">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <p className="font-semibold text-ink">{t.operatorName}</p>
+              <span className="code text-xs text-ink3">{t.busNumber}</span>
+            </div>
+            {status}
+          </div>
+
+          <div className="mt-6 flex items-center gap-5">
+            <div>
+              <p className={cx('display text-[2.5rem] sm:text-[3rem]', invalid ? 'text-ink3' : 'text-ink')}>{cityCode(t.routeFrom)}</p>
+              <p className="text-sm text-ink3">{t.routeFrom}</p>
+            </div>
+            <div className="flex flex-1 flex-col items-center">
+              <span className="num text-sm font-semibold text-ink2">{formatTime(t.departureTime)} → {formatTime(t.arrivalTime)}</span>
+              <span className="relative my-2 h-px w-full bg-linestrong">
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface px-2">
+                  <BerthGlyph className="h-4 w-7" state={invalid ? 'booked' : listed ? 'relay' : 'held'} />
+                </span>
+              </span>
+              <span className="text-xs text-ink3">{duration(t.departureTime, t.arrivalTime)} · {formatDate(t.travelDate)}</span>
+            </div>
+            <div className="text-right">
+              <p className={cx('display text-[2.5rem] sm:text-[3rem]', invalid ? 'text-ink3' : 'text-ink')}>{cityCode(t.routeTo)}</p>
+              <p className="text-sm text-ink3">{t.routeTo}</p>
+            </div>
+          </div>
+
+          <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-line pt-5 text-sm sm:grid-cols-4">
+            <div>
+              <dt className="text-ink3">Passenger</dt>
+              <dd className={cx('mt-0.5 font-semibold', invalid ? 'text-ink3 line-through decoration-danger/60' : 'text-ink')}>{t.passengerName}</dd>
+            </div>
+            <div>
+              <dt className="text-ink3">Age · gender</dt>
+              <dd className="mt-0.5 text-ink2">{t.passengerAge} · {t.passengerGender}</dd>
+            </div>
+            <div>
+              <dt className="text-ink3">Ticket</dt>
+              <dd className="code mt-0.5 text-ink2">{t.ticketNumber}</dd>
+            </div>
+            <div>
+              <dt className="text-ink3">Coach</dt>
+              <dd className="mt-0.5 truncate text-ink2" title={t.busType}>{t.busType}</dd>
+            </div>
+          </dl>
+
+          {(listed || invalid) && (
+            <div className="mt-6 rounded-xl bg-surface2 p-4">
+              <ol className="grid grid-cols-4 gap-2">
+                {STAGES.map((s, i) => {
+                  const done = i < stage;
+                  return (
+                    <li key={s}>
+                      <span className="block h-1.5 overflow-hidden rounded-full bg-linestrong/50">
+                        <motion.span
+                          className={cx('block h-full origin-left rounded-full', i < 2 ? 'bg-marigold' : 'bg-coach dark:bg-accent')}
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: done ? 1 : 0 }}
+                          transition={{ duration: 0.6, delay: 0.2 + i * 0.12, ease: EASE_OUT }}
+                        />
+                      </span>
+                      <span className={cx('mt-2 flex items-center gap-1 text-xs font-semibold', done ? 'text-ink' : 'text-ink3')}>
+                        {done && <Check className="h-3 w-3" strokeWidth={3} />}
+                        {s}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+              {invalid ? (
+                <p className="mt-4 text-sm text-ink2">
+                  Reissued to the new passenger and cancelled for boarding.{' '}
+                  <span className="font-semibold text-accent">{inr(refund)} refunded</span>
+                  {tx?.refundReferenceId && <span className="code ml-1 text-xs text-ink3">· {tx.refundReferenceId}</span>}
+                </p>
+              ) : (
+                <p className="mt-4 text-sm text-ink2">
+                  You'll get <span className="font-semibold text-ink">{inr(refund)}</span> back the moment the operator reissues the seat.
+                  {t.activeListing?.listingNumber && <span className="code ml-1 text-xs text-ink3">· {t.activeListing.listingNumber}</span>}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* perforation */}
+        <div className="relative hidden w-6 lg:block">
+          <div className="absolute inset-y-4 left-1/2 w-px -translate-x-1/2 border-l-2 border-dashed border-line" />
+          <span className="absolute -top-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-bg" />
+          <span className="absolute -bottom-3 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-bg" />
+        </div>
+
+        {/* stub */}
+        <div className="flex flex-col justify-between gap-6 border-t border-dashed border-line bg-surface2/60 p-6 lg:border-t-0">
+          <div className="flex items-end justify-between lg:block">
+            <div>
+              <p className="text-xs text-ink3">Berth</p>
+              <p className="code text-[2rem] font-semibold leading-tight text-ink">{t.seatNumber}</p>
+              <p className="text-xs text-ink3">{seatTypeLabel(t.seatType)}</p>
+            </div>
+            <div className="text-right lg:mt-4 lg:text-left">
+              <p className="text-xs text-ink3">Fare</p>
+              <p className="num text-xl font-bold text-ink">{inr(t.fare)}</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            {t.qrCode && !invalid && (
+              <Button variant={confirmed ? 'primary' : 'ghost'} size="sm" onClick={onViewQR} className="w-full">
+                <QrCode className="h-4 w-4" />
+                Boarding pass
+              </Button>
+            )}
+            {confirmed && (
+              <Button variant="accent" size="sm" onClick={onRelease} className="w-full">
+                Release this seat
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+            {listed && t.activeListing?.status === 'LISTED' && (
+              <Button variant="quiet" size="sm" onClick={onWithdraw} className="w-full">
+                <Undo2 className="h-4 w-4" />
+                Withdraw listing
+              </Button>
+            )}
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </article>
   );
 };

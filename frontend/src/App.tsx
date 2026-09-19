@@ -1,7 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import confetti from 'canvas-confetti';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { motion, useScroll, useSpring } from 'framer-motion';
+import {
+  Search,
+  Ticket as TicketIcon,
+  BookOpen,
+  Building2,
+  Home,
+  Lightbulb,
+  Network,
+  PlayCircle,
+  RotateCcw,
+  LogIn,
+  LogOut,
+  Route,
+  Lock,
+} from 'lucide-react';
 import { Navbar } from './components/Navbar';
-import { InteractiveDemoBar } from './components/InteractiveDemoBar';
 import { HomePage } from './components/HomePage';
 import { SearchBuses } from './components/SearchBuses';
 import { MyTickets } from './components/MyTickets';
@@ -12,12 +26,33 @@ import { DemoProgressModal } from './components/DemoProgressModal';
 import { TransactionLedger } from './components/TransactionLedger';
 import { AwsArchitectureModal } from './components/AwsArchitectureModal';
 import { AuthModal } from './components/AuthModal';
-import { Logo } from './components/Logo';
+import { Footer } from './components/Footer';
+import { LightCord } from './components/LightCord';
+import { Preloader } from './components/Preloader';
+import { CommandPalette, PaletteAction } from './components/CommandPalette';
+import { DeckPlan } from './components/DeckPlan';
+import { Button, EASE_OUT } from './components/ui';
+import { ThemeProvider, useTheme } from './lib/theme';
+import { ToastProvider, useToast } from './lib/toast';
+import { initSmoothScroll, scrollToId, scrollToTop } from './lib/scroll';
 import { User, Bus, Ticket, ReissueRequestItem, ResaleTransaction, Notification, ResaleSeatSummary } from './types';
 
-export function App() {
+type Tab = 'home' | 'search' | 'tickets' | 'operator' | 'transactions';
+
+const TITLES: Record<Tab, string> = {
+  home: 'SeatRelay · Your seat travels on',
+  search: 'Find a seat · SeatRelay',
+  tickets: 'My journeys · SeatRelay',
+  operator: 'Dispatch · SeatRelay',
+  transactions: 'Resale ledger · SeatRelay',
+};
+
+function Shell() {
+  const { notify } = useToast();
+  const { toggleTheme } = useTheme();
+
   // Navigation & User State
-  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'tickets' | 'operator' | 'transactions'>('home');
+  const [activeTab, setActiveTab] = useState<Tab>('home');
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -27,6 +62,7 @@ export function App() {
   const [reissues, setReissues] = useState<ReissueRequestItem[]>([]);
   const [transactions, setTransactions] = useState<ResaleTransaction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [searchQuery, setSearchQuery] = useState({ from: 'Bangalore', to: 'Chennai', date: '2026-09-19' });
 
   // Loading states
   const [isBusesLoading, setIsBusesLoading] = useState(false);
@@ -39,6 +75,8 @@ export function App() {
   const [selectedTicketForQR, setSelectedTicketForQR] = useState<Ticket | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+  const [authPrefill, setAuthPrefill] = useState<string | undefined>(undefined);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // Demo Runner State
   const [isDemoRunning, setIsDemoRunning] = useState(false);
@@ -49,11 +87,39 @@ export function App() {
 
   // Initial Fetch & Persistent Session Check
   useEffect(() => {
+    initSmoothScroll();
     checkSavedSession();
     fetchUsers();
     fetchBuses();
     fetchReissues();
     fetchTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    document.title = TITLES[activeTab];
+    scrollToTop(true);
+    // Each page arrives with fresh data
+    if (activeTab === 'search') fetchBuses();
+    if (activeTab === 'operator') fetchReissues();
+    if (activeTab === 'transactions') fetchTransactions();
+    if (activeTab === 'tickets' && currentUser) {
+      fetchTickets(currentUser.id);
+      fetchNotifications(currentUser.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Ctrl/Cmd + K opens the command menu
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const checkSavedSession = async () => {
@@ -61,9 +127,7 @@ export function App() {
     const savedUser = localStorage.getItem('seatrelay_user');
     if (token) {
       try {
-        const res = await fetch('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } });
         if (res.ok) {
           const user = await res.json();
           setCurrentUser(user);
@@ -76,7 +140,9 @@ export function App() {
     if (savedUser) {
       try {
         setCurrentUser(JSON.parse(savedUser));
-      } catch (e) {}
+      } catch (e) {
+        /* ignore corrupt session */
+      }
     }
   };
 
@@ -85,6 +151,7 @@ export function App() {
     localStorage.removeItem('seatrelay_user');
     setCurrentUser(null);
     setActiveTab('home');
+    notify({ tone: 'info', title: 'Signed out', body: 'See you on the next trip.' });
   };
 
   // When currentUser changes, fetch their tickets and notifications
@@ -93,6 +160,7 @@ export function App() {
       fetchTickets(currentUser.id);
       fetchNotifications(currentUser.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
   const fetchUsers = async () => {
@@ -103,21 +171,23 @@ export function App() {
       if (data.length > 0 && !currentUser) {
         // Default to Rahul Sharma (seller) for realistic demo initial state
         const rahul = data.find((u: User) => u.role === 'seller') || data[0];
-        setCurrentUser(rahul);
+        setCurrentUser((cur) => cur ?? rahul);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const fetchBuses = async (from = 'Bangalore', to = 'Chennai', date = '2026-09-19') => {
+  const fetchBuses = async (from = searchQuery.from, to = searchQuery.to, date = searchQuery.date) => {
     setIsBusesLoading(true);
+    setSearchQuery({ from, to, date });
     try {
       const res = await fetch(`/api/buses/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${encodeURIComponent(date)}`);
       const data = await res.json();
-      setBuses(data);
+      setBuses(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
+      notify({ tone: 'error', title: 'Could not load coaches', body: 'Check that the SeatRelay API is running, then search again.' });
     } finally {
       setIsBusesLoading(false);
     }
@@ -128,7 +198,7 @@ export function App() {
     try {
       const res = await fetch(`/api/tickets/my?userId=${userId}`);
       const data = await res.json();
-      setTickets(data);
+      setTickets(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -141,7 +211,7 @@ export function App() {
     try {
       const res = await fetch('/api/operator/reissues');
       const data = await res.json();
-      setReissues(data);
+      setReissues(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -154,7 +224,7 @@ export function App() {
     try {
       const res = await fetch('/api/transactions');
       const data = await res.json();
-      setTransactions(data);
+      setTransactions(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -166,30 +236,41 @@ export function App() {
     try {
       const res = await fetch(`/api/notifications/${userId}`);
       const data = await res.json();
-      setNotifications(data);
+      setNotifications(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
     }
   };
 
+  const refreshAll = () => {
+    fetchReissues();
+    fetchBuses();
+    fetchTransactions();
+    if (currentUser) {
+      fetchTickets(currentUser.id);
+      fetchNotifications(currentUser.id);
+    }
+  };
+
   // Operator Reissue Actions
   const handleApproveReissue = async (txId: string) => {
+    const req = reissues.find((r) => r.transactionId === txId);
     try {
       const res = await fetch(`/api/operator/reissues/${txId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operatorUserId: currentUser?.id })
+        body: JSON.stringify({ operatorUserId: currentUser?.id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to approve reissue');
-
-      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-      fetchReissues();
-      fetchBuses();
-      fetchTransactions();
-      if (currentUser) fetchTickets(currentUser.id);
+      if (!res.ok) throw new Error(data.error || 'The reissue did not go through.');
+      notify({
+        tone: 'success',
+        title: req ? `Berth ${req.seat.seatNumber} reissued to ${req.newPassenger.name}` : 'Ticket reissued',
+        body: req ? `${req.originalPassenger.ticketNumber} cancelled. Refund released to ${req.originalPassenger.name}.` : 'Old ticket cancelled, refund released.',
+      });
+      refreshAll();
     } catch (err: any) {
-      alert(err.message);
+      notify({ tone: 'error', title: 'Reissue failed', body: err.message });
     }
   };
 
@@ -198,60 +279,47 @@ export function App() {
       const res = await fetch(`/api/operator/reissues/${txId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason })
+        body: JSON.stringify({ reason }),
       });
       if (!res.ok) {
         const d = await res.json();
-        throw new Error(d.error || 'Failed to reject reissue');
+        throw new Error(d.error || 'The transfer could not be declined.');
       }
-      fetchReissues();
-      fetchBuses();
-      fetchTransactions();
-      if (currentUser) fetchTickets(currentUser.id);
+      notify({ tone: 'info', title: 'Transfer declined', body: "The buyer's payment is on its way back and the berth is on sale again." });
+      refreshAll();
     } catch (err: any) {
-      alert(err.message);
+      notify({ tone: 'error', title: 'Could not decline', body: err.message });
     }
   };
 
   // Checkout Success handler
-  const handleCheckoutSuccess = (purchaseData: any) => {
+  const handleCheckoutSuccess = () => {
+    const seat = selectedSeatForCheckout?.seat;
     setSelectedSeatForCheckout(null);
-    confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-    fetchBuses();
-    fetchReissues();
-    fetchTransactions();
-    if (currentUser) fetchTickets(currentUser.id);
-    // Switch to operator to illustrate next step
-    setActiveTab('operator');
+    notify({
+      tone: 'success',
+      title: seat ? `Berth ${seat.seatNumber} is held for you` : 'Seat held',
+      body: 'The operator reissues it in your name next. Your boarding pass will appear in My journeys.',
+    });
+    refreshAll();
   };
 
-  // Automated Full Demo Runner (Section 17)
+  // Automated Full Demo Runner
   const handleRunCompleteDemo = async () => {
     setIsDemoRunning(true);
     setDemoModalOpen(true);
     setDemoSteps([]);
     setDemoNewTicket(null);
-
     try {
-      const res = await fetch('/demo/run-full-flow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
+      const res = await fetch('/demo/run-full-flow', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
       const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || 'Demo execution failed');
-
+      if (!res.ok) throw new Error(data.error || 'The walkthrough stopped early.');
       setDemoSteps(data.steps || []);
       setDemoNewTicket(data.newTicket || null);
-      confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 } });
-
-      // Refresh all views
-      fetchBuses();
-      fetchReissues();
-      fetchTransactions();
-      if (currentUser) fetchTickets(currentUser.id);
+      refreshAll();
     } catch (err: any) {
-      alert(`Demo Error: ${err.message}`);
+      setDemoModalOpen(false);
+      notify({ tone: 'error', title: 'Walkthrough stopped', body: `${err.message} Try Reset demo data, then run it again.` });
     } finally {
       setIsDemoRunning(false);
     }
@@ -261,128 +329,179 @@ export function App() {
     try {
       const res = await fetch('/demo/reset', { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to reset demo state');
-      alert('Demo state reset successfully to pristine initial database.');
+      if (!res.ok) throw new Error(data.error || 'Reset failed.');
+      notify({ tone: 'success', title: 'Demo data reset', body: 'Rahul holds U12 again and the coach is sold out.' });
       fetchUsers();
-      fetchBuses();
-      fetchReissues();
-      fetchTransactions();
-      if (currentUser) fetchTickets(currentUser.id);
+      refreshAll();
     } catch (err: any) {
-      alert(`Reset Error: ${err.message}`);
+      notify({ tone: 'error', title: 'Could not reset', body: err.message });
     }
   };
 
+  const openAuth = (mode: 'login' | 'register' = 'login', prefill?: string) => {
+    setAuthModalMode(mode);
+    setAuthPrefill(prefill);
+    setAuthModalOpen(true);
+  };
+
+  const jump = useCallback(
+    (id: string) => {
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        window.setTimeout(() => scrollToId(id), 650);
+      } else {
+        scrollToId(id);
+      }
+    },
+    [activeTab]
+  );
+
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const isOperator = currentUser?.role === 'operator';
+
+  const paletteActions: PaletteAction[] = useMemo(
+    () => [
+      { id: 'home', group: 'Go to', label: 'Home', icon: <Home />, run: () => setActiveTab('home') },
+      { id: 'search', group: 'Go to', label: 'Find a seat', hint: 'Search coaches', icon: <Search />, run: () => setActiveTab('search') },
+      { id: 'tickets', group: 'Go to', label: 'My journeys', icon: <TicketIcon />, run: () => setActiveTab('tickets') },
+      { id: 'ledger', group: 'Go to', label: 'Resale ledger', icon: <BookOpen />, run: () => setActiveTab('transactions') },
+      ...(isOperator ? [{ id: 'ops', group: 'Go to', label: 'Dispatch console', icon: <Building2 />, run: () => setActiveTab('operator') }] : []),
+      { id: 'relay', group: 'Learn', label: 'The relay, stop by stop', icon: <Route />, run: () => jump('relay') },
+      { id: 'arch', group: 'Learn', label: 'Reference architecture', hint: 'AWS', icon: <Network />, run: () => setAwsModalOpen(true) },
+      { id: 'lights', group: 'Actions', label: 'Switch the lights', hint: 'Light or dark', icon: <Lightbulb />, run: () => toggleTheme() },
+      { id: 'demo', group: 'Actions', label: 'Run live walkthrough', icon: <PlayCircle />, run: handleRunCompleteDemo },
+      { id: 'reset', group: 'Actions', label: 'Reset demo data', icon: <RotateCcw />, run: handleResetDemo },
+      currentUser
+        ? { id: 'out', group: 'Account', label: `Sign out ${currentUser.name.split(' ')[0]}`, icon: <LogOut />, run: handleLogout }
+        : { id: 'in', group: 'Account', label: 'Sign in', icon: <LogIn />, run: () => openAuth('login') },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isOperator, currentUser, jump, toggleTheme]
+  );
+
+  // A thin marigold line sweeps the top edge as you read
+  const { scrollYProgress } = useScroll();
+  const progress = useSpring(scrollYProgress, { stiffness: 140, damping: 30, mass: 0.3 });
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="flex min-h-screen flex-col bg-bg font-sans text-ink">
+      <Preloader />
+      <motion.div className="fixed inset-x-0 top-0 z-[66] h-[2px] origin-left bg-marigold" style={{ scaleX: progress }} />
+      <LightCord hint />
+
       <Navbar
         currentUser={currentUser}
         users={users}
         onSelectUser={(u) => setCurrentUser(u)}
         activeTab={activeTab}
-        setActiveTab={(t) => setActiveTab(t as any)}
+        setActiveTab={setActiveTab}
+        notifications={notifications}
         unreadCount={unreadCount}
-        onOpenNotifications={() => {
-          if (notifications.length === 0) {
-            alert('No notifications right now.');
-          } else {
-            alert(notifications.map((n) => `• [${n.type}] ${n.title}\n${n.message}`).join('\n\n'));
-          }
-        }}
         onOpenAwsModal={() => setAwsModalOpen(true)}
-        onOpenAuth={(mode = 'login') => {
-          setAuthModalMode(mode);
-          setAuthModalOpen(true);
-        }}
+        onOpenAuth={(mode = 'login') => openAuth(mode)}
         onLogout={handleLogout}
         onRunCompleteDemo={handleRunCompleteDemo}
+        onResetDemo={handleResetDemo}
         isDemoRunning={isDemoRunning}
+        onOpenPalette={() => setPaletteOpen(true)}
+        onJump={jump}
       />
 
       <main className="flex-1">
-        {activeTab === 'home' && (
-          <HomePage
-            onSearchClick={() => setActiveTab('search')}
-            onViewTicketsClick={() => setActiveTab('tickets')}
-            onOperatorClick={() => setActiveTab('operator')}
-            onRunDemo={handleRunCompleteDemo}
-            isDemoRunning={isDemoRunning}
-            currentUser={currentUser}
-            onSelectRole={(role, tab) => {
-              const u = users.find((user) => user.role === role);
-              if (u) setCurrentUser(u);
-              setActiveTab(tab as any);
-            }}
-          />
-        )}
-
-        {activeTab === 'search' && (
-          <SearchBuses
-            buses={buses}
-            isLoading={isBusesLoading}
-            onSearch={(f, t, d) => fetchBuses(f, t, d)}
-            onSelectResaleSeat={(bus, seat) => {
-              // Ensure we are shopping as Priya (buyer) if not already
-              const buyerUser = users.find((u) => u.role === 'buyer') || currentUser;
-              if (buyerUser) setCurrentUser(buyerUser);
-              setSelectedSeatForCheckout({ bus, seat });
-            }}
-          />
-        )}
-
-        {activeTab === 'tickets' && currentUser && (
-          <MyTickets
-            currentUser={currentUser}
-            tickets={tickets}
-            isLoading={isTicketsLoading}
-            onRefresh={() => fetchTickets(currentUser.id)}
-            onViewQR={(t) => setSelectedTicketForQR(t)}
-          />
-        )}
-
-        {activeTab === 'operator' && (
-          currentUser?.role === 'operator' ? (
-            <OperatorDashboard
-              reissues={reissues}
-              isLoading={isReissuesLoading}
-              onRefresh={fetchReissues}
-              onApprove={handleApproveReissue}
-              onReject={handleRejectReissue}
-            />
-          ) : (
-            <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-3xl border border-slate-200 text-center shadow-sm">
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 font-black">
-                🔒
-              </div>
-              <h3 className="text-xl font-black text-slate-900 mb-2">Restricted Access</h3>
-              <p className="text-sm text-slate-500 mb-6">
-                The Operator Dispatch Console is restricted to verified bus fleet operators. Please log in with operator credentials (<code className="bg-slate-100 px-1 py-0.5 rounded text-xs font-mono text-slate-800">ops@swiftbus.in</code>).
-              </p>
-              <button
-                onClick={() => {
-                  setAuthModalMode('login');
-                  setAuthModalOpen(true);
+        {/* Enter-only transition: a page can never be left stranded mid-exit */}
+        <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 16, filter: 'blur(8px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            transition={{ duration: 0.55, ease: EASE_OUT }}
+          >
+            {activeTab === 'home' && (
+              <HomePage
+                onSearchClick={() => setActiveTab('search')}
+                onViewTicketsClick={() => setActiveTab('tickets')}
+                onOperatorClick={() => setActiveTab('operator')}
+                onRunDemo={handleRunCompleteDemo}
+                isDemoRunning={isDemoRunning}
+                currentUser={currentUser}
+                onOpenAwsModal={() => setAwsModalOpen(true)}
+                onSelectRole={(role, tab) => {
+                  const u = users.find((user) => user.role === role);
+                  if (u) setCurrentUser(u);
+                  setActiveTab(tab as Tab);
                 }}
-                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl transition-all"
-              >
-                Sign In as Operator
-              </button>
-            </div>
-          )
-        )}
+              />
+            )}
 
-        {activeTab === 'transactions' && (
-          <TransactionLedger
-            transactions={transactions}
-            isLoading={isLedgerLoading}
-            onRefresh={fetchTransactions}
-          />
-        )}
+            {activeTab === 'search' && (
+              <SearchBuses
+                buses={buses}
+                isLoading={isBusesLoading}
+                initial={searchQuery}
+                onSearch={(f, t, d) => fetchBuses(f, t, d)}
+                onSelectResaleSeat={(bus, seat) => {
+                  // Ensure we are shopping as Priya (buyer) if not already
+                  const buyerUser = users.find((u) => u.role === 'buyer') || currentUser;
+                  if (buyerUser) setCurrentUser(buyerUser);
+                  setSelectedSeatForCheckout({ bus, seat });
+                }}
+              />
+            )}
+
+            {activeTab === 'tickets' &&
+              (currentUser ? (
+                <MyTickets
+                  currentUser={currentUser}
+                  tickets={tickets}
+                  isLoading={isTicketsLoading}
+                  onRefresh={() => {
+                    fetchTickets(currentUser.id);
+                    fetchNotifications(currentUser.id);
+                    fetchBuses();
+                  }}
+                  onViewQR={(t) => setSelectedTicketForQR(t)}
+                />
+              ) : (
+                <Gate
+                  title="Sign in to see your journeys."
+                  body="Your tickets, released seats and refunds live here."
+                  action={<Button size="lg" onClick={() => openAuth('login')}>Sign in</Button>}
+                />
+              ))}
+
+            {activeTab === 'operator' &&
+              (isOperator ? (
+                <OperatorDashboard
+                  reissues={reissues}
+                  isLoading={isReissuesLoading}
+                  onRefresh={fetchReissues}
+                  onApprove={handleApproveReissue}
+                  onReject={handleRejectReissue}
+                />
+              ) : (
+                <Gate
+                  title="Dispatch is for operator staff."
+                  body={
+                    <>
+                      Reissuing a ticket changes who is on the manifest, so only signed-in operators can do it. Use the SwiftBus demo account,{' '}
+                      <span className="code text-ink">ops@swiftbus.in</span>.
+                    </>
+                  }
+                  action={
+                    <Button size="lg" onClick={() => openAuth('login', 'ops@swiftbus.in')}>
+                      <Lock className="h-4 w-4" />
+                      Sign in as operator
+                    </Button>
+                  }
+                />
+              ))}
+
+            {activeTab === 'transactions' && <TransactionLedger transactions={transactions} isLoading={isLedgerLoading} onRefresh={fetchTransactions} />}
+        </motion.div>
       </main>
 
-      {/* Checkout Modal */}
+      <Footer onNavigate={setActiveTab} onJump={jump} onOpenAwsModal={() => setAwsModalOpen(true)} isOperator={isOperator} />
+
+      {/* Checkout */}
       {selectedSeatForCheckout && currentUser && (
         <CheckoutModal
           bus={selectedSeatForCheckout.bus}
@@ -393,15 +512,9 @@ export function App() {
         />
       )}
 
-      {/* Digital Ticket Modal with verified QR */}
-      {selectedTicketForQR && (
-        <DigitalTicketModal
-          ticket={selectedTicketForQR}
-          onClose={() => setSelectedTicketForQR(null)}
-        />
-      )}
+      {/* Boarding pass */}
+      {selectedTicketForQR && <DigitalTicketModal ticket={selectedTicketForQR} onClose={() => setSelectedTicketForQR(null)} />}
 
-      {/* Complete Demo Progress Modal */}
       <DemoProgressModal
         isOpen={demoModalOpen}
         onClose={() => setDemoModalOpen(false)}
@@ -414,68 +527,53 @@ export function App() {
         }}
       />
 
-      {/* AWS Architecture & Step Functions Modal (Hackathon Judges Spec) */}
-      <AwsArchitectureModal
-        isOpen={awsModalOpen}
-        onClose={() => setAwsModalOpen(false)}
-      />
+      <AwsArchitectureModal isOpen={awsModalOpen} onClose={() => setAwsModalOpen(false)} />
 
-      {/* Production Real Authentication Modal */}
       <AuthModal
         isOpen={authModalOpen}
         initialMode={authModalMode}
+        prefillEmail={authPrefill}
         onClose={() => setAuthModalOpen(false)}
         onSuccess={(user) => {
           setCurrentUser(user);
           fetchUsers();
+          notify({ tone: 'success', title: `Welcome aboard, ${user.name.split(' ')[0]}` });
           if (user.role === 'seller') setActiveTab('tickets');
           else if (user.role === 'operator') setActiveTab('operator');
           else setActiveTab('search');
         }}
       />
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-10 text-xs">
-        <div className="max-w-7xl mx-auto px-4 space-y-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-6">
-            <div className="flex items-center gap-3">
-              <Logo size={34} />
-              <div>
-                <span className="text-base font-black text-white">Seat<span className="text-emerald-500">Relay</span></span>
-                <p className="text-[11px] text-slate-400">Authorized Passenger Reissuance & Resale Platform</p>
-              </div>
-            </div>
-
-            {/* Compliance badges */}
-            <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono">
-              <span className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-emerald-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>DPDP Act 2023 Compliant</span>
-              </span>
-              <span className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-slate-300">
-                256-Bit Escrow Vault
-              </span>
-              <span className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-amber-300">
-                Zero Scalping Policy
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
-            <p>
-              © {new Date().getFullYear()} SeatRelay Technologies Inc. Built for carrier-integrated reissuance. All passenger tickets are verified by carrier GDS systems prior to boarding.
-            </p>
-            <div className="flex items-center gap-4">
-              <span className="hover:text-slate-300 cursor-pointer">Carrier Manifest Terms</span>
-              <span>•</span>
-              <span className="hover:text-slate-300 cursor-pointer">Data Privacy & ID Masking</span>
-              <span>•</span>
-              <span className="hover:text-slate-300 cursor-pointer">Escrow Settlement</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} actions={paletteActions} />
     </div>
+  );
+}
+
+const Gate: React.FC<{ title: string; body: React.ReactNode; action: React.ReactNode }> = ({ title, body, action }) => (
+  <div className="mx-auto w-full max-w-[1320px] px-5 pb-12 pt-32 sm:px-8 sm:pt-40">
+    <div className="mx-auto grid max-w-4xl items-center gap-10 rounded-2xl border border-line bg-surface p-8 sm:p-12 md:grid-cols-[1.1fr_0.9fr]">
+      <div>
+        <span className="grid h-11 w-11 place-items-center rounded-xl bg-surface2 text-ink2">
+          <Lock className="h-5 w-5" strokeWidth={1.75} />
+        </span>
+        <h1 className="display-md mt-6 text-[2rem] text-ink">{title}</h1>
+        <p className="mt-3 text-[1.0625rem] leading-relaxed text-ink2">{body}</p>
+        <div className="mt-8">{action}</div>
+      </div>
+      <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 0.55 }} transition={{ duration: 0.8, ease: EASE_OUT }} className="hidden md:block">
+        <DeckPlan phase="booked" showOthers={false} />
+      </motion.div>
+    </div>
+  </div>
+);
+
+export function App() {
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

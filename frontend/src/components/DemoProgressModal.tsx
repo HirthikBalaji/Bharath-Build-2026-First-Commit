@@ -1,14 +1,9 @@
 import React from 'react';
-import { 
-  CheckCircle2, 
-  ArrowRight, 
-  X, 
-  RefreshCw, 
-  QrCode, 
-  ShieldCheck, 
-  IndianRupee 
-} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, QrCode } from 'lucide-react';
 import { Ticket } from '../types';
+import { inr } from '../lib/format';
+import { BerthGlyph, Button, EASE_OUT, Modal } from './ui';
 
 interface DemoProgressModalProps {
   isOpen: boolean;
@@ -19,104 +14,91 @@ interface DemoProgressModalProps {
   onViewTicket: (ticket: Ticket) => void;
 }
 
-export const DemoProgressModal: React.FC<DemoProgressModalProps> = ({
-  isOpen,
-  onClose,
-  isRunning,
-  steps,
-  newTicket,
-  onViewTicket
-}) => {
-  if (!isOpen) return null;
+export const DemoProgressModal: React.FC<DemoProgressModalProps> = ({ isOpen, onClose, isRunning, steps, newTicket, onViewTicket }) => (
+  <Modal open={isOpen} onClose={onClose} label="Live walkthrough" size="lg">
+    <div className="bg-coach px-7 pb-7 pt-8 text-coachink sm:px-9">
+      <p className="kicker opacity-75">Live walkthrough</p>
+      <h2 className="display-md mt-3 pr-8 text-[1.875rem]">One berth, end to end.</h2>
+      <p className="mt-2 max-w-lg text-coachink/75">Rahul releases, Priya claims, SwiftBus reissues, the refund goes out. Every step below is a real state change in the demo backend.</p>
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="bg-slate-900 text-white p-6 relative">
-          <button
-            onClick={onClose}
-            className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              DEMO MODE EXECUTION
-            </span>
-          </div>
-          <h2 className="text-xl font-bold">
-            End-to-End Resale & Reissue Lifecycle
-          </h2>
-          <p className="text-xs text-slate-300 mt-1">
-            Tracking live state changes across Seller, Marketplace, Buyer, Operator, and Escrow.
-          </p>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 max-h-[70vh] overflow-y-auto space-y-6">
-          {/* Status Tracker */}
-          <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200">
-            {steps.map((s, idx) => (
-              <div key={idx} className="relative group">
-                <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold shadow-md shadow-emerald-600/30">
-                  ✓
-                </div>
-                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
-                  <div className="flex items-center justify-between font-bold text-slate-900 mb-1">
-                    <span>{s.step}. {s.title}</span>
-                    <span className="text-[10px] font-mono text-slate-400">
-                      {new Date(s.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="text-slate-600 leading-relaxed">{s.detail}</p>
-                </div>
-              </div>
-            ))}
-
-            {isRunning && (
-              <div className="relative">
-                <div className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-emerald-100 border-2 border-emerald-600 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-emerald-600 animate-ping"></div>
-                </div>
-                <div className="bg-emerald-50/60 p-3.5 rounded-2xl border border-emerald-200 text-xs flex items-center gap-2 text-emerald-800 font-medium">
-                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-                  <span>Simulating next step in transaction pipeline...</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Finished Banner with Action */}
-          {!isRunning && newTicket && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3">
-              <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>Demo Run Succeeded! Ticket Successfully Reissued.</span>
-              </div>
-              <p className="text-xs text-emerald-800">
-                Priya Kumar now holds digital ticket <span className="font-mono font-bold">{newTicket.ticketNumber}</span> for Seat U12. Rahul Sharma has received his ₹{newTicket.fare} refund.
-              </p>
-
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  onClick={() => onViewTicket(newTicket)}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <QrCode className="w-4 h-4" />
-                  <span>View Priya's Reissued QR Ticket</span>
-                </button>
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+      <div className="relative mt-7 h-7">
+        <div className="absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 bg-coachink/20" />
+        <motion.div
+          className="absolute left-0 top-1/2 h-[2px] -translate-y-1/2 bg-marigold"
+          initial={{ width: '0%' }}
+          animate={{ width: isRunning ? ['0%', '88%'] : '100%' }}
+          transition={isRunning ? { duration: 6, ease: 'easeOut' } : { duration: 0.6, ease: EASE_OUT }}
+        />
+        <motion.div
+          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+          initial={{ left: '0%' }}
+          animate={{ left: isRunning ? ['0%', '88%'] : '100%' }}
+          transition={isRunning ? { duration: 6, ease: 'easeOut' } : { duration: 0.6, ease: EASE_OUT }}
+        >
+          <BerthGlyph className="h-5 w-9" state="relay" />
+        </motion.div>
       </div>
     </div>
-  );
-};
+
+    <div className="max-h-[52vh] overflow-y-auto px-7 py-7 sm:px-9" data-lenis-prevent>
+      <ol className="relative space-y-5 border-l border-line pl-7">
+        <AnimatePresence>
+          {steps.map((s, i) => (
+            <motion.li
+              key={`${s.step}-${i}`}
+              initial={{ opacity: 0, x: -12, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+              transition={{ duration: 0.5, delay: i * 0.12, ease: EASE_OUT }}
+              className="relative"
+            >
+              <motion.span
+                className="absolute -left-[2.35rem] top-0.5 grid h-5 w-5 place-items-center rounded-full bg-coach text-coachink dark:bg-accent dark:text-[rgb(var(--bg))]"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 22, delay: i * 0.12 + 0.1 }}
+              >
+                <Check className="h-3 w-3" strokeWidth={3} />
+              </motion.span>
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="font-semibold text-ink">{s.title}</p>
+                <span className="code flex-shrink-0 text-[0.6875rem] text-ink3">{new Date(s.timestamp).toLocaleTimeString('en-GB')}</span>
+              </div>
+              <p className="mt-1 text-sm leading-relaxed text-ink2">{s.detail}</p>
+            </motion.li>
+          ))}
+        </AnimatePresence>
+        {isRunning && (
+          <li className="relative">
+            <span className="absolute -left-[2.35rem] top-0.5 grid h-5 w-5 place-items-center rounded-full border-2 border-marigold bg-surface">
+              <span className="h-2 w-2 animate-ping rounded-full bg-marigold" />
+            </span>
+            <p className="text-sm text-ink2">Running the next step…</p>
+          </li>
+        )}
+      </ol>
+
+      {!isRunning && newTicket && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: steps.length * 0.12 + 0.2, ease: EASE_OUT }}
+          className="mt-8 rounded-2xl border border-coach/30 bg-coach/[0.05] p-5 dark:border-accent/30"
+        >
+          <p className="font-semibold text-ink">Transfer complete.</p>
+          <p className="mt-1 text-sm text-ink2">
+            {newTicket.passengerName} now holds ticket <span className="code text-ink">{newTicket.ticketNumber}</span> for berth {newTicket.seatNumber}. The seller's {inr(newTicket.fare)} refund has been released.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button onClick={() => onViewTicket(newTicket)}>
+              <QrCode className="h-4 w-4" />
+              View the new boarding pass
+            </Button>
+            <Button variant="quiet" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  </Modal>
+);

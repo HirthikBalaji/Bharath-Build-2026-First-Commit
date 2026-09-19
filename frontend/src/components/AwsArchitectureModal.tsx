@@ -1,299 +1,185 @@
 import React, { useState } from 'react';
-import {
-  X,
-  Server,
-  Database,
-  GitBranch,
-  Layers,
-  Zap,
-  ShieldCheck,
-  Clock,
-  Bell,
-  HardDrive,
-  Activity,
-  CheckCircle2,
-  Lock,
-  ArrowRight,
-  Sparkles,
-  Users
-} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowDown, ArrowRight, BellRing, CalendarClock, Cpu, Database, Globe, HardDrive, KeyRound, Server, Workflow } from 'lucide-react';
+import { cx, EASE_OUT, Modal } from './ui';
 
 interface AwsArchitectureModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export const AwsArchitectureModal: React.FC<AwsArchitectureModalProps> = ({
-  isOpen,
-  onClose
-}) => {
-  const [activeTab, setActiveTab] = useState<'architecture' | 'stateMachine' | 'moneyModel' | 'raceCondition'>('architecture');
+type Tab = 'architecture' | 'stateMachine' | 'moneyModel' | 'raceCondition';
 
-  if (!isOpen) return null;
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'architecture', label: 'Services' },
+  { id: 'stateMachine', label: 'State machine' },
+  { id: 'moneyModel', label: 'Money model' },
+  { id: 'raceCondition', label: 'One-buyer guarantee' },
+];
+
+const SERVICES = [
+  { icon: Globe, name: 'Amplify Hosting', body: 'Hosts the React app.' },
+  { icon: KeyRound, name: 'Cognito', body: 'Three groups: seller, buyer, operator.' },
+  { icon: Server, name: 'API Gateway', body: 'REST endpoints for every action.' },
+  { icon: Cpu, name: 'Lambda', body: 'Listing, claim, payment hold, approval.' },
+  { icon: Workflow, name: 'Step Functions', body: 'The transfer workflow. Waits for the operator with a task token and rolls back on timeout.', lead: true },
+  { icon: Database, name: 'DynamoDB', body: 'Listings, operator tickets, transfers. Conditional writes decide the one buyer.' },
+  { icon: CalendarClock, name: 'EventBridge Scheduler', body: 'One schedule per listing that expires it at the cutoff.' },
+  { icon: BellRing, name: 'SNS', body: 'Updates to seller, buyer and operator at each step.' },
+  { icon: HardDrive, name: 'S3', body: 'Ticket uploads and generated boarding passes.' },
+];
+
+const HAPPY = ['LISTED', 'CLAIMED', 'PAYMENT_HELD', 'AWAITING_OPERATOR', 'REISSUED', 'SELLER_REFUNDED', 'COMPLETE'];
+
+export const AwsArchitectureModal: React.FC<AwsArchitectureModalProps> = ({ isOpen, onClose }) => {
+  const [tab, setTab] = useState<Tab>('architecture');
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white p-6 relative border-b border-slate-800 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="absolute top-5 right-5 text-slate-400 hover:text-white p-1.5 rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-mono font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              AWS ARCHITECTURE & STATE MACHINE SPECIFICATION
-            </span>
-            <span className="text-xs font-mono text-slate-400">Bharat Builds 2026</span>
-          </div>
-          <h2 className="text-2xl font-black">
-            SeatRelay Cloud & Resale Protocol Architecture
-          </h2>
-          <p className="text-xs text-slate-300 mt-1 max-w-2xl">
-            Operator-authorized seat reissuance modeled with AWS Step Functions, atomic DynamoDB conditional writes, EventBridge TTL expiry, and strict face-value math.
-          </p>
-
-          {/* Tab Navigation */}
-          <div className="flex items-center gap-2 mt-5 text-xs font-bold">
+    <Modal open={isOpen} onClose={onClose} label="Reference architecture" size="xl">
+      <div className="bg-[rgb(var(--ink))] px-7 pb-0 pt-8 text-[rgb(var(--bg))] dark:bg-surface2 dark:text-ink sm:px-10">
+        <p className="kicker text-marigold">Reference architecture · AWS</p>
+        <h2 className="display-md mt-3 max-w-2xl pr-8 text-[2rem]">How a seat changes hands, under the floor.</h2>
+        <p className="mt-2 max-w-2xl text-[0.9375rem] opacity-70">
+          The target AWS design for SeatRelay. The demo backend models the same states and rules.
+        </p>
+        <div className="mt-7 flex gap-1 overflow-x-auto" role="tablist" data-lenis-prevent>
+          {TABS.map((t) => (
             <button
-              onClick={() => setActiveTab('architecture')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
-                activeTab === 'architecture'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-700/30'
-                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={cx('relative whitespace-nowrap px-4 pb-4 pt-2 text-sm font-semibold transition-opacity', tab === t.id ? 'opacity-100' : 'opacity-55 hover:opacity-85')}
             >
-              ☁️ AWS Services (Ship It Track)
+              {t.label}
+              {tab === t.id && <motion.span layoutId="aws-tab" className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-marigold" />}
             </button>
-            <button
-              onClick={() => setActiveTab('stateMachine')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
-                activeTab === 'stateMachine'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-700/30'
-                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              ⚡ Step Functions State Machine
-            </button>
-            <button
-              onClick={() => setActiveTab('moneyModel')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
-                activeTab === 'moneyModel'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-700/30'
-                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              💰 Zero-Markup Money Model
-            </button>
-            <button
-              onClick={() => setActiveTab('raceCondition')}
-              className={`px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
-                activeTab === 'raceCondition'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-700/30'
-                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              🛡️ 1-Buyer Atomic Claim
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-700 text-xs leading-relaxed">
-          {/* TAB 1: AWS Services Architecture */}
-          {activeTab === 'architecture' && (
-            <div className="space-y-6">
-              <div className="bg-slate-900 text-emerald-400 p-4 rounded-2xl font-mono text-[11px] overflow-x-auto border border-slate-800 shadow-inner">
-                <pre>{`React (Amplify Hosting) ── Cognito (3 Groups: seller, buyer, operator)
-        │
-   API Gateway (REST)
-        │
-     Lambdas ──────────► DynamoDB (Listings, OperatorTickets, Transfers)
-        │                     ▲  (Conditional writes guarantee 1 winner)
-        ├── start ──► Step Functions (Transfer Workflow: wait-for-task-token)
-        │                     │
-        │                     ├──► SNS Notifications (SMS / Email)
-        │                     ▲
-        └── operator approve/reject sends task token back
-        
- EventBridge Scheduler ──(at cutoff: T-60m)──► expireListing Lambda
- S3 ◄── ticket uploads / generated QR boarding passes
- CloudWatch ◄── audit logs, metrics dashboard (money recovered)`}</pre>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <Server className="w-4 h-4 text-emerald-600" />
-                    <span>AWS Amplify & Cognito</span>
-                  </div>
-                  <p className="text-slate-600">
-                    Hosts the responsive React web application. Cognito partitions permissions into 3 dedicated RBAC user groups: <code>seller</code>, <code>buyer</code>, and <code>operator</code>.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <GitBranch className="w-4 h-4 text-indigo-600" />
-                    <span>AWS Step Functions (Centerpiece)</span>
-                  </div>
-                  <p className="text-slate-600">
-                    Runs state machine with the <strong>Wait for Task Token</strong> pattern. Workflow pauses while awaiting operator authorization with automatic timeout rollback.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <Database className="w-4 h-4 text-teal-600" />
-                    <span>Amazon DynamoDB</span>
-                  </div>
-                  <p className="text-slate-600">
-                    Stores <code>Listings</code>, <code>OperatorTickets</code>, and <code>Transfers</code>. Conditional expressions (<code>status = LISTED</code>) guarantee race-safe claims.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-amber-600" />
-                    <span>EventBridge Scheduler & SNS</span>
-                  </div>
-                  <p className="text-slate-600">
-                    EventBridge schedules precise one-time triggers at departure cutoff (T-60 min) to lift holds. SNS sends multi-channel updates at each step.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: State Machine */}
-          {activeTab === 'stateMachine' && (
-            <div className="space-y-5">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <h4 className="font-bold text-slate-900 mb-2">Step Functions Transfer State Transitions</h4>
-                <div className="bg-slate-950 text-emerald-300 p-4 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-800">
-                  <pre>{`             withdraw
-   LISTED ─────────────► WITHDRAWN
-     │  ▲
-claim│  │ payment window timeout (10m)
-     ▼  │ or operator reject/timeout (before cutoff)
-   CLAIMED ──pay──► PAYMENT_HELD ──► AWAITING_OPERATOR ──approve──► REISSUED ──► SELLER_REFUNDED ──► COMPLETE
-     
-   LISTED ── cutoff reached (T-60m) ──► EXPIRED
-   AWAITING_OPERATOR ── reject/timeout after cutoff ──► buyer refunded ──► EXPIRED`}</pre>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h5 className="font-bold text-slate-900 text-xs uppercase tracking-wider">Automated Failure Paths (Guaranteed Rollbacks):</h5>
-                <ul className="space-y-2 text-slate-600">
-                  <li className="flex items-start gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <span className="font-bold text-rose-600 min-w-[120px]">Payment Timeout:</span>
-                    <span>If buyer claims but does not pay within 10 minutes, claim lock is released and seat goes back to <code>LISTED</code>.</span>
-                  </li>
-                  <li className="flex items-start gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <span className="font-bold text-rose-600 min-w-[120px]">Operator Rejection:</span>
-                    <span>Held buyer funds are instantly returned. If before cutoff, listing returns to <code>LISTED</code>; otherwise it expires cleanly.</span>
-                  </li>
-                  <li className="flex items-start gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <span className="font-bold text-rose-600 min-w-[120px]">Departure Cutoff:</span>
-                    <span>EventBridge triggers auto-expiry at T-60 min. Hold lifted. Seller falls back to standard operator policy.</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: Money Model */}
-          {activeTab === 'moneyModel' && (
-            <div className="space-y-5">
-              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl text-emerald-950">
-                <h4 className="font-bold text-sm text-emerald-900 mb-1">
-                  Why SeatRelay Is Strictly Face-Value (Zero Scalping)
-                </h4>
-                <p className="text-xs text-emerald-800 leading-relaxed">
-                  Platform fees and operator fees are taken <strong>out of money the seller would otherwise have lost</strong> in the no-refund window, never on top of the buyer fare. The buyer pays exactly what was on the original ticket.
-                </p>
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Stakeholder</th>
-                      <th className="py-3 px-4">Standard Cancellation (Today)</th>
-                      <th className="py-3 px-4 bg-emerald-100/60 text-emerald-900">With SeatRelay Protocol</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    <tr>
-                      <td className="py-3 px-4 font-bold text-slate-900">Buyer Pays</td>
-                      <td className="py-3 px-4 text-slate-500">Seat unavailable (Sold out)</td>
-                      <td className="py-3 px-4 font-black text-emerald-700 bg-emerald-50/50">₹850 (Exact Face Value)</td>
-                    </tr>
-                    <tr>
-                      <td className="py-3 px-4 font-bold text-slate-900">Seller Recovers</td>
-                      <td className="py-3 px-4 text-rose-600 font-bold">₹0 (100% loss in no-refund window)</td>
-                      <td className="py-3 px-4 font-black text-emerald-700 bg-emerald-50/50">₹850 (100% of face-value fare)</td>
-                    </tr>
-                    <tr>
-                      <td className="py-3 px-4 font-bold text-slate-900">Operator Keeps</td>
-                      <td className="py-3 px-4 text-slate-500">Penalty fee, but seat runs empty or unauthorized</td>
-                      <td className="py-3 px-4 font-bold text-slate-800 bg-emerald-50/50">Paid seat on manifest + Verified passenger ID</td>
-                    </tr>
-                    <tr>
-                      <td className="py-3 px-4 font-bold text-slate-900">Manifest Sync</td>
-                      <td className="py-3 px-4 text-rose-600 font-semibold">Ghost passenger or illegal cash-swap</td>
-                      <td className="py-3 px-4 font-bold text-emerald-700 bg-emerald-50/50">100% Accurate name & masked Govt ID</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: Atomic Race-Condition Protection */}
-          {activeTab === 'raceCondition' && (
-            <div className="space-y-4">
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                  <span>The One-Buyer Guarantee (DynamoDB Conditional Update)</span>
-                </h4>
-                <p className="text-slate-600">
-                  When a seat goes viral on a sold-out route, multiple buyers may click "Buy" at the exact same millisecond. SeatRelay enforces atomic reservation locking:
-                </p>
-                <div className="bg-slate-950 text-emerald-400 p-4 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-800">
-                  <pre>{`UpdateItem Listings
-  SET status = 'CLAIMED',
-      buyerId = :buyer,
-      claimExpiresAt = :timeout
-  WHERE listingId = :id
-  CONDITION status = 'LISTED'`}</pre>
-                </div>
-                <p className="text-slate-600">
-                  If two buyers execute this at the identical instant, <strong>exactly one transaction succeeds</strong>. The second receives a clean <code>409 Conflict: "Seat already claimed"</code> message, preventing double-selling.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
-          <div className="text-xs text-slate-500 font-mono">
-            Submission Track: WeMakeDevs x AWS Bharat Builds Tour 2026
-          </div>
-          <button
-            onClick={onClose}
-            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
-          >
-            Close Spec
-          </button>
+          ))}
         </div>
       </div>
-    </div>
+
+      <div className="min-h-[420px] px-7 py-8 sm:px-10">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
+            transition={{ duration: 0.35, ease: EASE_OUT }}
+          >
+            {tab === 'architecture' && (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {SERVICES.map((s, i) => (
+                  <motion.div
+                    key={s.name}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04, duration: 0.4 }}
+                    className={cx('rounded-xl border p-4', s.lead ? 'border-marigold bg-marigold/10 sm:col-span-2 lg:col-span-1' : 'border-line')}
+                  >
+                    <s.icon className={cx('h-5 w-5', s.lead ? 'text-[rgb(150_96_0)] dark:text-marigold' : 'text-ink3')} strokeWidth={1.6} />
+                    <p className="mt-3 font-semibold text-ink">{s.name}</p>
+                    <p className="mt-1 text-sm leading-snug text-ink2">{s.body}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {tab === 'stateMachine' && (
+              <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr]">
+                <div>
+                  <p className="text-sm font-semibold text-ink">The happy path</p>
+                  <ol className="mt-4 space-y-1.5">
+                    {HAPPY.map((s, i) => (
+                      <motion.li key={s} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.06 }}>
+                        <span className={cx('code inline-flex rounded-lg px-3 py-1.5 text-xs font-semibold', s === 'AWAITING_OPERATOR' ? 'bg-marigold text-marigoldink' : s === 'COMPLETE' ? 'bg-coach text-coachink' : 'bg-surface2 text-ink')}>
+                          {s}
+                        </span>
+                        {i < HAPPY.length - 1 && <ArrowDown className="my-1 ml-4 h-3.5 w-3.5 text-ink3" />}
+                      </motion.li>
+                    ))}
+                  </ol>
+                  <p className="mt-4 text-sm text-ink3">AWAITING_OPERATOR pauses on a Step Functions task token until the operator approves or declines.</p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-ink">Automatic rollbacks</p>
+                  <ul className="mt-4 divide-y divide-line rounded-xl border border-line">
+                    {[
+                      ['Buyer does not pay in 10 minutes', 'Claim released, seat back to LISTED.'],
+                      ['Operator declines or times out', "Buyer's payment returned. Back to LISTED before the cutoff, otherwise EXPIRED."],
+                      ['Cutoff reached, 60 min before departure', 'EventBridge expires the listing. Seller keeps the normal cancellation terms.'],
+                      ['Seller changes their mind', 'Withdraw while LISTED. Ticket unchanged.'],
+                    ].map(([k, v]) => (
+                      <li key={k} className="p-4">
+                        <p className="font-semibold text-ink">{k}</p>
+                        <p className="mt-1 flex items-start gap-2 text-sm text-ink2">
+                          <ArrowRight className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-ink3" />
+                          {v}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {tab === 'moneyModel' && (
+              <div>
+                <p className="max-w-2xl text-[1.0625rem] leading-relaxed text-ink2">
+                  Any fee comes out of money the seller would otherwise have lost, never on top of the buyer's fare. The buyer pays what is printed on the ticket.
+                </p>
+                <div className="mt-6 overflow-hidden rounded-xl border border-line">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-surface2/70 text-xs text-ink3">
+                      <tr>
+                        <th className="px-5 py-3 font-medium">Who</th>
+                        <th className="px-5 py-3 font-medium">Cancelling today</th>
+                        <th className="px-5 py-3 font-medium text-accent">With SeatRelay</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {[
+                        ['Buyer pays', 'No seat, the route is sold out', '₹850, the printed fare'],
+                        ['Seller gets back', '₹0 inside the no-refund window', '₹850 once reissued (₹0 fee in this build)'],
+                        ['Operator gets', 'The penalty, and a seat that may run empty or off the record', 'A paid seat and a verified passenger'],
+                        ['Manifest', 'Can drift from who is on board', 'Real name, masked ID'],
+                      ].map(([a, b, c]) => (
+                        <tr key={a}>
+                          <td className="px-5 py-4 font-semibold text-ink">{a}</td>
+                          <td className="px-5 py-4 text-ink2">{b}</td>
+                          <td className="px-5 py-4 font-medium text-ink">{c}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-3 text-xs text-ink3">Illustrative figures from the demo fare.</p>
+              </div>
+            )}
+
+            {tab === 'raceCondition' && (
+              <div className="grid gap-8 lg:grid-cols-2">
+                <div>
+                  <p className="text-[1.0625rem] leading-relaxed text-ink2">
+                    When a berth appears on a sold-out route, two people can tap Claim in the same instant. The claim is one conditional write, so exactly one succeeds.
+                  </p>
+                  <p className="mt-4 text-[1.0625rem] leading-relaxed text-ink2">
+                    The other gets a clean <span className="code text-ink">409</span>, "someone just claimed this seat", and nobody is charged twice.
+                  </p>
+                </div>
+                <pre className="code overflow-x-auto rounded-xl bg-[rgb(var(--ink))] p-5 text-[0.8125rem] leading-relaxed text-[rgb(var(--bg))] dark:bg-surface2 dark:text-ink" data-lenis-prevent>
+{`UpdateItem  Listings
+  Key       listingId = :id
+  SET       status = 'CLAIMED',
+            buyerId = :buyer,
+            claimExpiresAt = :t
+  CONDITION status = 'LISTED'`}
+                </pre>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </Modal>
   );
 };

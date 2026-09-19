@@ -98,9 +98,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Building2 className="w-4 h-4" />
               <span>Operator Portal</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                Mock GDS
-              </span>
             </button>
             <button
               onClick={() => setActiveTab('transactions')}
@@ -111,36 +108,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <BookOpen className="w-4 h-4" />
-              <span>Ledger</span>
-            </button>
-            <button
-              onClick={onOpenAwsModal}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors flex items-center gap-1.5"
-            >
-              <span>☁️ AWS Architecture</span>
+              <span>Resale Ledger</span>
             </button>
           </nav>
 
           {/* Action & Role Switcher */}
           <div className="flex items-center gap-3">
-            {/* Complete Demo Trigger */}
-            <button
-              onClick={onRunCompleteDemo}
-              disabled={isDemoRunning}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-xs sm:text-sm px-3.5 py-2 rounded-lg shadow-sm shadow-emerald-700/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
-            >
-              {isDemoRunning ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Running Demo...</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-amber-300">▶</span>
-                  <span>Run Complete Demo</span>
-                </>
-              )}
-            </button>
 
             {/* Notification bell */}
             <button

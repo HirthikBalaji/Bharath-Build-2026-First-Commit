@@ -50,8 +50,8 @@ export const HomePage: React.FC<HomePageProps> = ({
         <div className="relative max-w-5xl mx-auto text-center space-y-8">
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold backdrop-blur-md shadow-inner">
-            <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-            <span className="font-mono uppercase tracking-wider font-bold">Protocol Specification v1.0 • Face-Value Guaranteed</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span className="font-mono uppercase tracking-wider font-bold">100% Face-Value • Zero Scalping Guaranteed</span>
           </div>
 
           {/* Heading */}
@@ -67,7 +67,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </p>
           </div>
 
-          {/* Search Box Prompt (Section 15) */}
+          {/* Search Box Prompt */}
           <div className="max-w-3xl mx-auto pt-2">
             <div className="bg-slate-800/80 backdrop-blur-xl p-3 sm:p-4 rounded-3xl border border-slate-700/80 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="grid grid-cols-3 gap-3 flex-1 w-full text-left px-3">
@@ -93,18 +93,6 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <span>Search Buses</span>
               </button>
             </div>
-          </div>
-
-          {/* Quick Demo CTA */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <button
-              onClick={onRunDemo}
-              disabled={isDemoRunning}
-              className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-700/30 transition-all hover:scale-105 cursor-pointer disabled:opacity-50"
-            >
-              <Zap className="w-4 h-4 fill-current text-amber-300" />
-              <span>{isDemoRunning ? 'Simulating Complete Workflow...' : '▶ Run Complete Demo (1-Click)'}</span>
-            </button>
           </div>
         </div>
       </section>
@@ -180,15 +168,15 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* Interactive Role Switcher Matrix (Section 16) */}
+      {/* Interactive Role Portals */}
       <section className="max-w-6xl mx-auto px-4">
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-1.5 text-xs font-bold font-mono text-indigo-700 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200 mb-2">
-            Multi-Persona Demo Environment
+            Access Portals
           </div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Select a Role to Experience the Protocol</h2>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Select Your Portal</h2>
           <p className="text-sm text-slate-500 mt-1">
-            Toggle directly into any user's perspective with pre-seeded demo state.
+            Seamlessly switch between passenger ticketing, seat release, and operator reissuance.
           </p>
         </div>
 
@@ -301,9 +289,9 @@ export const HomePage: React.FC<HomePageProps> = ({
               <p className="text-xs font-mono text-slate-400">ops@swiftbus.in</p>
 
               <div className="mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-600 space-y-1">
-                <div className="font-bold text-slate-800">Simulated Operator GDS Terminal</div>
+                <div className="font-bold text-slate-800">SwiftBus Dispatch Terminal</div>
                 <div>Authorized Passenger Reissuance</div>
-                <div className="text-amber-800 font-bold">1-Click Approve / Reject Reissue</div>
+                <div className="text-amber-800 font-bold">Manage Manifest & Reissues</div>
               </div>
 
               <ul className="text-xs text-slate-600 space-y-2 mt-5">

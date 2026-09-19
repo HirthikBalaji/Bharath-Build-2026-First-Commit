@@ -14,6 +14,7 @@ import {
   LogOut,
   Route,
   Lock,
+  ShieldCheck,
 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { HomePage } from './components/HomePage';
@@ -35,9 +36,10 @@ import { Button, EASE_OUT } from './components/ui';
 import { ThemeProvider, useTheme } from './lib/theme';
 import { ToastProvider, useToast } from './lib/toast';
 import { initSmoothScroll, scrollToId, scrollToTop } from './lib/scroll';
+import { ProductionPortal } from './components/ProductionPortal';
 import { User, Bus, Ticket, ReissueRequestItem, ResaleTransaction, Notification, ResaleSeatSummary } from './types';
 
-type Tab = 'home' | 'search' | 'tickets' | 'operator' | 'transactions';
+type Tab = 'home' | 'search' | 'tickets' | 'operator' | 'transactions' | 'live';
 
 const TITLES: Record<Tab, string> = {
   home: 'SeatRelay · Your seat finds its next rider',
@@ -45,6 +47,7 @@ const TITLES: Record<Tab, string> = {
   tickets: 'My journeys · SeatRelay',
   operator: 'Dispatch · SeatRelay',
   transactions: 'Resale ledger · SeatRelay',
+  live: 'Production Workspace · SeatRelay Live',
 };
 
 function Shell() {
@@ -377,6 +380,7 @@ function Shell() {
       { id: 'search', group: 'Go to', label: 'Find a seat', hint: 'Search coaches', icon: <Search />, run: () => setActiveTab('search') },
       { id: 'tickets', group: 'Go to', label: 'My journeys', icon: <TicketIcon />, run: () => setActiveTab('tickets') },
       { id: 'ledger', group: 'Go to', label: 'Resale ledger', icon: <BookOpen />, run: () => setActiveTab('transactions') },
+      { id: 'live', group: 'Go to', label: 'Live Production Portal', hint: 'Real Fleet & DigiLocker', icon: <ShieldCheck className="h-4 w-4" />, run: () => setActiveTab('live') },
       ...(isOperator ? [{ id: 'ops', group: 'Go to', label: 'Dispatch console', icon: <Building2 />, run: () => setActiveTab('operator') }] : []),
       { id: 'relay', group: 'Learn', label: 'The relay, stop by stop', icon: <Route />, run: () => jump('relay') },
       { id: 'arch', group: 'Learn', label: 'Reference architecture', hint: 'AWS', icon: <Network />, run: () => setAwsModalOpen(true) },
@@ -517,6 +521,27 @@ function Shell() {
               ))}
 
             {activeTab === 'transactions' && <TransactionLedger transactions={transactions} isLoading={isLedgerLoading} onRefresh={fetchTransactions} />}
+
+            {activeTab === 'live' && (
+              <ProductionPortal
+                currentUser={currentUser}
+                onOpenAuth={(mode = 'login') => openAuth(mode)}
+                onLogout={handleLogout}
+                onSelectResaleSeat={(bus, seat) => {
+                  if (currentUser?.role === 'buyer') {
+                    setSelectedSeatForCheckout({ bus, seat });
+                    return;
+                  }
+                  const demoBuyer = users.find((u) => u.role === 'buyer');
+                  if (!demoBuyer) {
+                    openAuth('login');
+                    return;
+                  }
+                  setCurrentUser(demoBuyer);
+                  setSelectedSeatForCheckout({ bus, seat });
+                }}
+              />
+            )}
         </motion.div>
       </main>
 

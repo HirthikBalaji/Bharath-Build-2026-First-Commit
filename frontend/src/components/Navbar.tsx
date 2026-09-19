@@ -28,7 +28,7 @@ import { BerthGlyph, cx, EASE_OUT, Pill } from './ui';
 import { Notification, User } from '../types';
 import { initials, timeAgo } from '../lib/format';
 
-type Tab = 'home' | 'search' | 'tickets' | 'operator' | 'transactions';
+type Tab = 'home' | 'search' | 'tickets' | 'operator' | 'transactions' | 'live';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -124,6 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { tab: 'search', label: 'Find a seat' },
     { tab: 'tickets', label: 'My journeys' },
     { tab: 'transactions', label: 'Ledger' },
+    { tab: 'live', label: 'Live Portal' },
     ...(isOperator ? [{ tab: 'operator' as Tab, label: 'Dispatch' }] : []),
   ];
 

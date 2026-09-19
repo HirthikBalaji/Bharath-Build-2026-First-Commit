@@ -8,13 +8,14 @@ interface AwsArchitectureModalProps {
   onClose: () => void;
 }
 
-type Tab = 'architecture' | 'stateMachine' | 'moneyModel' | 'raceCondition';
+type Tab = 'architecture' | 'stateMachine' | 'moneyModel' | 'raceCondition' | 'cbdc';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'architecture', label: 'Services' },
   { id: 'stateMachine', label: 'State machine' },
   { id: 'moneyModel', label: 'Money model' },
   { id: 'raceCondition', label: 'One-buyer guarantee' },
+  { id: 'cbdc', label: 'e-Rupee (CBDC) Escrow' },
 ];
 
 const SERVICES = [
@@ -174,6 +175,52 @@ export const AwsArchitectureModal: React.FC<AwsArchitectureModalProps> = ({ isOp
             buyerId = :buyer,
             claimExpiresAt = :t
   CONDITION status = 'LISTED'`}
+                </pre>
+              </div>
+            )}
+
+            {tab === 'cbdc' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-bold text-ink">RBI Central Bank Digital Currency (e-Rupee) Programmable Settlement</h3>
+                  <p className="mt-1 text-sm text-ink2 max-w-2xl leading-relaxed">
+                    Commercial bank refunds take T+2 to T+5 days due to clearing-house batching. SeatRelay uses programmable e-Rupee smart contracts to guarantee instant T+0 settlement upon cryptographic operator signature.
+                  </p>
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-xl border border-line bg-surface">
+                    <p className="text-xs text-ink3">1. Token Encumbrance</p>
+                    <p className="font-semibold text-sm text-ink mt-1">LOCKED into Escrow</p>
+                    <p className="text-xs text-ink2 mt-1">Buyer's e-Rupee tokens are locked with purpose-bound condition.</p>
+                  </div>
+                  <div className="p-4 rounded-xl border border-line bg-surface">
+                    <p className="text-xs text-ink3">2. Oracle / Operator Trigger</p>
+                    <p className="font-semibold text-sm text-ink mt-1">Cryptographic Dispatch Sig</p>
+                    <p className="text-xs text-ink2 mt-1">Operator signs the manifest reissue with Ed25519 auth code.</p>
+                  </div>
+                  <div className="p-4 rounded-xl border border-line bg-surface">
+                    <p className="text-xs text-ink3">3. Atomic Split Payout</p>
+                    <p className="font-semibold text-sm text-accent mt-1">T+0 Real-Time Transfer</p>
+                    <p className="text-xs text-ink2 mt-1">Funds land in seller's wallet in milliseconds. Zero bank delays.</p>
+                  </div>
+                </div>
+
+                <pre className="code overflow-x-auto rounded-xl bg-[rgb(var(--ink))] p-5 text-[0.8125rem] leading-relaxed text-[rgb(var(--bg))] dark:bg-surface2 dark:text-ink" data-lenis-prevent>
+{`// RBI e-Rupee Programmable Token Smart Contract
+contract SeatRelayCBDCEscrow {
+    address public buyerWallet;
+    address public sellerWallet;
+    address public operatorEscrow;
+    uint256 public amount;
+    
+    function executeSettlement(bytes memory operatorSig) external {
+        require(verifyOperatorSignature(operatorSig), "INVALID_REISSUE_AUTH");
+        // Instant Atomic T+0 payout to original traveller
+        eRupeeToken.transfer(sellerWallet, amount);
+        emit ResaleSettled(sellerWallet, amount, block.timestamp);
+    }
+}`}
                 </pre>
               </div>
             )}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Check, CheckCircle2, Clock, RefreshCw, X } from 'lucide-react';
+import { ArrowRight, Check, CheckCircle2, Clock, RefreshCw, X, Coins, ShieldCheck } from 'lucide-react';
 import { ReissueRequestItem } from '../types';
 import { formatDate, formatTime, inr, maskId, timeAgo } from '../lib/format';
 import { BerthGlyph, Button, CountUp, cx, EASE_OUT, EmptyState, Modal, PageHeader, Pill } from './ui';
@@ -168,13 +168,28 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({ reissues, 
                           <Row k={r.newPassenger.govIdType} v={<span className="code">{maskId(r.newPassenger.govIdNumber)}</span>} />
                           <Row k="Paid, held" v={<span className="font-semibold text-ink">{inr(r.resalePrice)}</span>} />
                         </dl>
+
+                        {r.cbdcEscrow && (
+                          <div className="mt-4 p-3 rounded-lg border border-accent/25 bg-accent/10 text-xs text-ink space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold text-accent">
+                              <Coins className="h-3.5 w-3.5" />
+                              <span>RBI e-Rupee Smart Contract Escrow</span>
+                            </div>
+                            <p className="font-mono text-[0.6875rem] text-ink2 truncate">
+                              Address: <span className="text-ink font-semibold">{r.cbdcEscrow.contractAddress}</span>
+                            </p>
+                            <p className="text-[0.6875rem] text-accent">
+                              Condition: <strong>Instant T+0 atomic split</strong> executes upon your 1-click approval.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     <footer className="flex flex-col gap-4 border-t border-line bg-surface2/50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <p className="max-w-xl text-sm text-ink2">
                         Approving cancels <span className="code text-ink">{r.originalPassenger.ticketNumber}</span>, reissues berth {r.seat.seatNumber} to{' '}
-                        <span className="font-semibold text-ink">{r.newPassenger.name}</span> and refunds {inr(r.sellerRefundAmount)}.
+                        <span className="font-semibold text-ink">{r.newPassenger.name}</span> and refunds {inr(r.sellerRefundAmount)}{r.cbdcEscrow ? ' instantly via e-Rupee' : ''}.
                       </p>
                       <div className="flex gap-2">
                         <Button variant="quiet" onClick={() => setRejectModalTx(r)} disabled={busy} className="text-danger hover:bg-danger/10 hover:text-danger">

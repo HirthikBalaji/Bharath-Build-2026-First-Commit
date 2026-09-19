@@ -179,6 +179,29 @@ export interface ReissueRequestItem {
     qrCode?: string | null;
   } | null;
   refunds?: any[];
+  cbdcEscrow?: CBDCEscrowContract | null;
+}
+
+export interface CBDCEscrowContract {
+  id: string;
+  contractAddress: string;
+  transactionId: string;
+  listingId: string;
+  amount: number;
+  buyerWalletAddress: string;
+  sellerWalletAddress: string;
+  operatorWalletAddress: string;
+  programCondition: string;
+  tokenIds: string;
+  status: 'LOCKED' | 'SETTLED' | 'REFUNDED';
+  escrowLockHash: string;
+  settlementTxHash?: string | null;
+  settledAt?: string | null;
+  createdAt: string;
+  routeFrom?: string;
+  routeTo?: string;
+  busNumber?: string;
+  buyerPassengerName?: string;
 }
 
 export interface ResaleTransaction {

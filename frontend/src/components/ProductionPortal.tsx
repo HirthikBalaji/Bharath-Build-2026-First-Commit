@@ -18,7 +18,8 @@ import {
   ArrowRight,
   ChevronRight,
   LogOut,
-  UserCheck
+  UserCheck,
+  Coins
 } from 'lucide-react';
 import { Bus, User, Seat } from '../types';
 import { inr, formatTime, formatDate, seatTypeLabel, maskId } from '../lib/format';
@@ -37,8 +38,10 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
   onLogout,
   onSelectResaleSeat
 }) => {
-  const [subTab, setSubTab] = useState<'marketplace' | 'fleet' | 'direct_booking' | 'kyc'>('marketplace');
+  const [subTab, setSubTab] = useState<'marketplace' | 'fleet' | 'direct_booking' | 'kyc' | 'cbdc'>('marketplace');
   const [buses, setBuses] = useState<Bus[]>([]);
+  const [cbdcContracts, setCbdcContracts] = useState<any[]>([]);
+  const [isLoadingCbdc, setIsLoadingCbdc] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -97,8 +100,22 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
     }
   };
 
+  const fetchCbdcContracts = async () => {
+    setIsLoadingCbdc(true);
+    try {
+      const res = await fetch('/api/cbdc/contracts');
+      const data = await res.json();
+      setCbdcContracts(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoadingCbdc(false);
+    }
+  };
+
   useEffect(() => {
     fetchLiveBuses();
+    fetchCbdcContracts();
   }, []);
 
   const handleCreateBus = async (e: React.FormEvent) => {
@@ -333,6 +350,7 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
           { id: 'fleet', label: isOperator ? 'Operator Fleet Console' : 'Operator Fleet (Restricted)', icon: Users },
           { id: 'direct_booking', label: 'Direct Ticket Booking', icon: Ticket },
           { id: 'kyc', label: 'DigiLocker Identity Gateway', icon: ShieldCheck },
+          { id: 'cbdc', label: 'RBI e-Rupee Programmable Escrow', icon: Coins },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = subTab === tab.id;
@@ -823,6 +841,119 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* TAB 5: RBI e-RUPEE (CBDC) PROGRAMMABLE ESCROW */}
+      {subTab === 'cbdc' && (
+        <div className="mt-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-ink">RBI Digital Rupee (e-Rupee) Programmable Escrow</h2>
+                <span className="px-2 py-0.5 rounded-full bg-accent/15 text-accent text-xs font-bold font-mono">
+                  T+0 Smart Contracts
+                </span>
+              </div>
+              <p className="text-sm text-ink3 mt-1">
+                Real-time purpose-bound tokens locked until operator manifest approval, replacing T+3 day bank delays.
+              </p>
+            </div>
+            <Button variant="ghost" onClick={fetchCbdcContracts} loading={isLoadingCbdc}>
+              <RefreshCw className="h-4 w-4" /> Refresh Contracts
+            </Button>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="p-5 rounded-2xl bg-surface border border-line">
+              <p className="text-xs text-ink3">Programmability Rule</p>
+              <p className="text-sm font-bold text-ink mt-1 font-mono">OPERATOR_REISSUE_SIG</p>
+              <p className="text-xs text-ink2 mt-2 leading-relaxed">
+                Tokens unlock only upon cryptographic verification of operator passenger transfer.
+              </p>
+            </div>
+            <div className="p-5 rounded-2xl bg-surface border border-line">
+              <p className="text-xs text-ink3">Settlement Latency</p>
+              <p className="text-xl font-bold text-accent mt-1">T+0 Instant</p>
+              <p className="text-xs text-ink2 mt-2 leading-relaxed">
+                Zero clearing houses. Funds land directly in the seller's RBI e-Rupee wallet.
+              </p>
+            </div>
+            <div className="p-5 rounded-2xl bg-surface border border-line">
+              <p className="text-xs text-ink3">Active Escrow Contracts</p>
+              <p className="text-xl font-bold text-ink mt-1 font-mono">{cbdcContracts.length}</p>
+              <p className="text-xs text-ink2 mt-2 leading-relaxed">
+                Atomic token encumbrance contracts verified by the national retail ledger.
+              </p>
+            </div>
+          </div>
+
+          {cbdcContracts.length === 0 ? (
+            <div className="text-center py-16 bg-surface rounded-2xl border border-line">
+              <Coins className="h-12 w-12 text-ink3 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-ink">No Active e-Rupee Escrow Contracts</h3>
+              <p className="text-sm text-ink2 mt-1 max-w-md mx-auto">
+                When a buyer claims a relayed seat using <strong className="text-ink">e-Rupee (CBDC)</strong>, the smart contract lock will appear here with cryptographic hashes, wallet addresses, and instant split triggers.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {cbdcContracts.map((c) => (
+                <div key={c.id} className="p-6 rounded-2xl bg-surface border border-line hover:shadow-lift transition-all space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="code font-bold text-ink text-sm">{c.contractAddress}</span>
+                      <span className="text-xs text-ink2">{c.routeFrom} → {c.routeTo} · Coach {c.busNumber}</span>
+                    </div>
+                    <div>
+                      {c.status === 'SETTLED' ? (
+                        <Pill tone="coach">T+0 Settled</Pill>
+                      ) : c.status === 'REFUNDED' ? (
+                        <Pill tone="danger">Decumbered (Refunded)</Pill>
+                      ) : (
+                        <Pill tone="marigold" dot>Tokens Encumbered (Locked)</Pill>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                    <div>
+                      <span className="text-ink3 block mb-0.5">Amount Encumbered</span>
+                      <span className="font-bold text-sm text-ink">{inr(c.amount)}</span>
+                    </div>
+                    <div>
+                      <span className="text-ink3 block mb-0.5">Buyer CBDC Wallet</span>
+                      <span className="font-mono text-ink font-semibold truncate block" title={c.buyerWalletAddress}>
+                        {c.buyerWalletAddress}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-ink3 block mb-0.5">Seller CBDC Wallet</span>
+                      <span className="font-mono text-ink font-semibold truncate block" title={c.sellerWalletAddress}>
+                        {c.sellerWalletAddress}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-ink3 block mb-0.5">Operator Escrow Wallet</span>
+                      <span className="font-mono text-ink font-semibold truncate block" title={c.operatorWalletAddress}>
+                        {c.operatorWalletAddress}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-surface2/60 rounded-xl border border-line text-xs font-mono text-ink2 space-y-1">
+                    <p className="truncate">Escrow Lock Hash: <span className="text-ink font-semibold">{c.escrowLockHash}</span></p>
+                    {c.settlementTxHash && (
+                      <p className="truncate text-accent font-semibold">Settlement Tx Hash: {c.settlementTxHash}</p>
+                    )}
+                    {c.tokenIds && (
+                      <p className="truncate text-ink3">RBI Serialized Tokens: {c.tokenIds}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

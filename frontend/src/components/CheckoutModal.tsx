@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertCircle, CreditCard, Lock, ShieldCheck, Smartphone } from 'lucide-react';
+import { AlertCircle, CreditCard, Lock, ShieldCheck, Smartphone, Coins } from 'lucide-react';
 import { Bus, ResaleSeatSummary, User } from '../types';
 import { cityCode, formatDate, formatTime, inr, maskId, seatTypeLabel } from '../lib/format';
 import { BerthGlyph, Button, cx, EASE_OUT, Modal, Segmented } from './ui';
@@ -21,7 +21,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ bus, seat, current
   const [phone, setPhone] = useState(currentUser.phone || '');
   const [govIdType, setGovIdType] = useState('Aadhaar Card');
   const [govIdNumber, setGovIdNumber] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Card'>('UPI');
+  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Card' | 'CBDC'>('CBDC');
 
   // DigiLocker verification state
   const [digilockerTxnId, setDigilockerTxnId] = useState<string | null>(null);
@@ -328,11 +328,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ bus, seat, current
                 </fieldset>
 
                 <fieldset className="border-t border-line pt-6">
-                  <legend className="mb-3 text-sm font-medium text-ink2">Pay with</legend>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <legend className="text-sm font-medium text-ink2">Pay with</legend>
+                    <span className="inline-flex items-center gap-1 text-[0.6875rem] font-bold tracking-wide uppercase px-2 py-0.5 rounded-full bg-accent/15 text-accent border border-accent/25">
+                      e-Rupee Escrow Protocol
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2.5">
                     {[
-                      { id: 'UPI' as const, title: 'UPI', note: 'Any UPI app', icon: <Smartphone className="h-5 w-5" strokeWidth={1.75} /> },
-                      { id: 'Card' as const, title: 'Card', note: 'Debit or credit', icon: <CreditCard className="h-5 w-5" strokeWidth={1.75} /> },
+                      { id: 'CBDC' as const, title: 'e-Rupee (CBDC)', note: 'RBI Smart Contract Escrow', icon: <Coins className="h-5 w-5 text-accent" strokeWidth={1.75} />, highlight: true },
+                      { id: 'UPI' as const, title: 'UPI', note: 'Instant UPI App', icon: <Smartphone className="h-5 w-5" strokeWidth={1.75} /> },
+                      { id: 'Card' as const, title: 'Card', note: 'Debit or Credit', icon: <CreditCard className="h-5 w-5" strokeWidth={1.75} /> },
                     ].map((m) => {
                       const on = paymentMethod === m.id;
                       return (
@@ -342,21 +348,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ bus, seat, current
                           onClick={() => setPaymentMethod(m.id)}
                           aria-pressed={on}
                           className={cx(
-                            'relative flex items-center gap-3 rounded-xl border p-4 text-left transition-colors',
-                            on ? 'border-coach bg-coach/5 dark:border-accent' : 'border-line hover:border-linestrong'
+                            'relative flex flex-col justify-between p-3.5 rounded-xl border text-left transition-all',
+                            on ? 'border-accent bg-accent/5 ring-1 ring-accent' : 'border-line hover:border-linestrong'
                           )}
                         >
-                          <span className={cx('grid h-10 w-10 place-items-center rounded-lg transition-colors', on ? 'bg-coach text-coachink' : 'bg-surface2 text-ink2')}>{m.icon}</span>
-                          <span>
-                            <span className="block font-semibold text-ink">{m.title}</span>
-                            <span className="block text-xs text-ink3">{m.note}</span>
-                          </span>
-                          <span className={cx('absolute right-4 top-4 h-4 w-4 rounded-full border-2 transition-colors', on ? 'border-coach bg-coach dark:border-accent dark:bg-accent' : 'border-linestrong')} />
+                          <div className="flex items-center justify-between w-full mb-2">
+                            <span className={cx('grid h-8 w-8 place-items-center rounded-lg transition-colors', on ? 'bg-accent/15 text-accent' : 'bg-surface2 text-ink2')}>{m.icon}</span>
+                            <span className={cx('h-3.5 w-3.5 rounded-full border-2 transition-colors', on ? 'border-accent bg-accent' : 'border-linestrong')} />
+                          </div>
+                          <div>
+                            <span className="block font-semibold text-xs sm:text-sm text-ink">{m.title}</span>
+                            <span className="block text-[0.6875rem] text-ink3 mt-0.5 line-clamp-1">{m.note}</span>
+                          </div>
                         </button>
                       );
                     })}
                   </div>
-                  <p className="mt-2 text-xs text-ink3">Demo payment. No money moves.</p>
+                  {paymentMethod === 'CBDC' ? (
+                    <div className="mt-3 p-2.5 rounded-xl bg-accent/10 border border-accent/20 text-xs text-ink flex items-start gap-2">
+                      <Coins className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-accent">Programmable RBI e-Rupee Token Escrow:</span>
+                        <p className="text-[0.75rem] text-ink2 mt-0.5">
+                          Tokens are locked into smart contract <code className="font-mono text-accent">0xESC_SEATRELAY</code> and disbursed to the seller at <strong>T+0 (instant zero-delay)</strong> only when the operator digitally signs the passenger reissue.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-ink3">Standard payment gateway simulation.</p>
+                  )}
                 </fieldset>
 
                 <div>
@@ -383,10 +403,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ bus, seat, current
                 <p className="mt-3 max-w-md text-[1.0625rem] leading-relaxed text-ink2">
                   {bus.operator} will reissue berth <span className="code font-semibold text-ink">{seat.seatNumber}</span> in the name <span className="font-semibold text-ink">{passengerName}</span>. Your {inr(total)} stays on hold until then, and your boarding pass will appear in My journeys.
                 </p>
+                {purchase?.cbdcEscrow && (
+                  <div className="mt-5 p-3.5 rounded-xl border border-accent/30 bg-accent/10 text-left space-y-1.5 font-mono text-xs">
+                    <div className="flex items-center gap-1.5 font-bold text-accent">
+                      <Coins className="h-4 w-4" />
+                      <span>RBI e-Rupee Smart Contract Escrow Activated</span>
+                    </div>
+                    <p className="text-ink2 truncate">Contract: <span className="text-ink font-bold">{purchase.cbdcEscrow.contractAddress}</span></p>
+                    <p className="text-ink2 truncate">Buyer Wallet: <span className="text-ink">{purchase.cbdcEscrow.buyerWallet}</span></p>
+                    <p className="text-ink2 truncate">Lock Hash: <span className="text-ink">{purchase.cbdcEscrow.escrowLockHash}</span></p>
+                    <p className="text-accent text-[0.6875rem]">Condition: Instant T+0 Atomic Settlement upon Operator Reissue Approval</p>
+                  </div>
+                )}
                 {purchase?.transactionNumber || purchase?.transaction?.transactionNumber ? (
                   <p className="code mt-5 text-sm text-ink3">Reference {purchase.transactionNumber ?? purchase.transaction.transactionNumber}</p>
                 ) : null}
-                <div className="mt-10">
+                <div className="mt-8">
                   <Button size="lg" onClick={finish}>
                     Done
                   </Button>

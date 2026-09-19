@@ -6,6 +6,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    allowedHosts: [
+      'seatrelay.anandhappriya.dpdns.org',
+      '.dpdns.org',
+      'localhost'
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

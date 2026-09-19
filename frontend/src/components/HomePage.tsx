@@ -180,7 +180,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className={`grid grid-cols-1 ${currentUser?.role === 'operator' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6`}>
           {/* Seller Profile Card */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/5 transition-all flex flex-col justify-between">
             <div>
@@ -273,51 +273,53 @@ export const HomePage: React.FC<HomePageProps> = ({
             </button>
           </div>
 
-          {/* Operator Profile Card */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/5 transition-all flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                  Operator Portal
-                </span>
-                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-800 flex items-center justify-center font-black">
-                  SB
+          {/* Operator Profile Card - ONLY shown if logged in user is an operator */}
+          {currentUser?.role === 'operator' && (
+            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:border-emerald-500 hover:shadow-xl hover:shadow-emerald-500/5 transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                    Operator Portal
+                  </span>
+                  <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-800 flex items-center justify-center font-black">
+                    SB
+                  </div>
                 </div>
+
+                <h3 className="text-xl font-black text-slate-900">SwiftBus Operations</h3>
+                <p className="text-xs font-mono text-slate-400">ops@swiftbus.in</p>
+
+                <div className="mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-600 space-y-1">
+                  <div className="font-bold text-slate-800">SwiftBus Dispatch Terminal</div>
+                  <div>Authorized Passenger Reissuance</div>
+                  <div className="text-amber-800 font-bold">Manage Manifest & Reissues</div>
+                </div>
+
+                <ul className="text-xs text-slate-600 space-y-2 mt-5">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>Compare old passenger vs new passenger identity</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>Invalidate old ticket & trigger seller refund</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>Issue authorized digital boarding QR code</span>
+                  </li>
+                </ul>
               </div>
 
-              <h3 className="text-xl font-black text-slate-900">SwiftBus Operations</h3>
-              <p className="text-xs font-mono text-slate-400">ops@swiftbus.in</p>
-
-              <div className="mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-600 space-y-1">
-                <div className="font-bold text-slate-800">SwiftBus Dispatch Terminal</div>
-                <div>Authorized Passenger Reissuance</div>
-                <div className="text-amber-800 font-bold">Manage Manifest & Reissues</div>
-              </div>
-
-              <ul className="text-xs text-slate-600 space-y-2 mt-5">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                  <span>Compare old passenger vs new passenger identity</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                  <span>Invalidate old ticket & trigger seller refund</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                  <span>Issue authorized digital boarding QR code</span>
-                </li>
-              </ul>
+              <button
+                onClick={() => onSelectRole('operator', 'operator')}
+                className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.02]"
+              >
+                <span>Access Operator Terminal</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
-
-            <button
-              onClick={() => onSelectRole('operator', 'operator')}
-              className="mt-6 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md hover:scale-[1.02]"
-            >
-              <span>Continue as Operator</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          )}
         </div>
       </section>
 

@@ -343,13 +343,34 @@ export function App() {
         )}
 
         {activeTab === 'operator' && (
-          <OperatorDashboard
-            reissues={reissues}
-            isLoading={isReissuesLoading}
-            onRefresh={fetchReissues}
-            onApprove={handleApproveReissue}
-            onReject={handleRejectReissue}
-          />
+          currentUser?.role === 'operator' ? (
+            <OperatorDashboard
+              reissues={reissues}
+              isLoading={isReissuesLoading}
+              onRefresh={fetchReissues}
+              onApprove={handleApproveReissue}
+              onReject={handleRejectReissue}
+            />
+          ) : (
+            <div className="max-w-md mx-auto my-16 p-8 bg-white rounded-3xl border border-slate-200 text-center shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 font-black">
+                🔒
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-2">Restricted Access</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                The Operator Dispatch Console is restricted to verified bus fleet operators. Please log in with operator credentials (<code className="bg-slate-100 px-1 py-0.5 rounded text-xs font-mono text-slate-800">ops@swiftbus.in</code>).
+              </p>
+              <button
+                onClick={() => {
+                  setAuthModalMode('login');
+                  setAuthModalOpen(true);
+                }}
+                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-xl transition-all"
+              >
+                Sign In as Operator
+              </button>
+            </div>
+          )
         )}
 
         {activeTab === 'transactions' && (

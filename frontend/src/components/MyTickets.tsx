@@ -37,13 +37,21 @@ export const MyTickets: React.FC<MyTicketsProps> = ({ currentUser, tickets, isLo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('seatrelay_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (currentUser?.id) headers['x-user-id'] = currentUser.id;
+    return headers;
+  };
+
   const handleListTicket = async (ticket: Ticket) => {
     setIsSubmitting(true);
     setActionError(null);
     try {
       const res = await fetch(`/api/tickets/${ticket.id}/list`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ sellerId: currentUser.id }),
       });
       const data = await res.json();
@@ -65,7 +73,7 @@ export const MyTickets: React.FC<MyTicketsProps> = ({ currentUser, tickets, isLo
     try {
       const res = await fetch(`/api/resale/${listingId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ sellerId: currentUser.id }),
       });
       if (!res.ok) {

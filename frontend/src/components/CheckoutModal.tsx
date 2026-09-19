@@ -15,12 +15,12 @@ interface CheckoutModalProps {
 
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ bus, seat, currentUser, onClose, onSuccess }) => {
-  const [passengerName, setPassengerName] = useState(currentUser.name || 'Priya Kumar');
+  const [passengerName, setPassengerName] = useState(currentUser.name || '');
   const [passengerAge, setPassengerAge] = useState(24);
   const [passengerGender, setPassengerGender] = useState<'Female' | 'Male' | 'Other'>('Female');
-  const [phone, setPhone] = useState(currentUser.phone || '+91 98765 43210');
+  const [phone, setPhone] = useState(currentUser.phone || '');
   const [govIdType, setGovIdType] = useState('Aadhaar Card');
-  const [govIdNumber, setGovIdNumber] = useState('9876 5432 4821');
+  const [govIdNumber, setGovIdNumber] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'Card'>('UPI');
 
   const [isProcessing, setIsProcessing] = useState(false);

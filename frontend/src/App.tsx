@@ -193,10 +193,20 @@ function Shell() {
     }
   };
 
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('seatrelay_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (currentUser?.id) headers['x-user-id'] = currentUser.id;
+    return headers;
+  };
+
   const fetchTickets = async (userId: string) => {
     setIsTicketsLoading(true);
     try {
-      const res = await fetch(`/api/tickets/my?userId=${userId}`);
+      const res = await fetch(`/api/tickets/my?userId=${userId}`, {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
       setTickets(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -209,7 +219,9 @@ function Shell() {
   const fetchReissues = async () => {
     setIsReissuesLoading(true);
     try {
-      const res = await fetch('/api/operator/reissues');
+      const res = await fetch('/api/operator/reissues', {
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
       setReissues(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -258,7 +270,7 @@ function Shell() {
     try {
       const res = await fetch(`/api/operator/reissues/${txId}/approve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ operatorUserId: currentUser?.id }),
       });
       const data = await res.json();
@@ -278,7 +290,7 @@ function Shell() {
     try {
       const res = await fetch(`/api/operator/reissues/${txId}/reject`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ reason }),
       });
       if (!res.ok) {

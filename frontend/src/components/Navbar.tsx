@@ -236,7 +236,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <Search className="h-4 w-4" />
                 <span>Search</span>
-                <kbd className="code rounded border border-line px-1.5 py-0.5 text-[0.625rem] text-ink3">Ctrl K</kbd>
+                <kbd className="code rounded border border-line px-1.5 py-0.5 text-[0.625rem] text-ink3">
+                  {typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.userAgent) ? '⌘K' : 'Ctrl K'}
+                </kbd>
               </button>
 
               {currentUser && (

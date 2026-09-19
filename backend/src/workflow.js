@@ -1,4 +1,5 @@
 const { DatabaseService } = require('./db');
+const { CBDCEscrowService } = require('./cbdc.service');
 const QRCode = require('qrcode');
 const crypto = require('crypto');
 
@@ -40,7 +41,8 @@ class MockOperatorService {
       supports_passenger_reissue: true,
       minimum_resale_window_minutes: 60,
       maximum_resale_price: 'FACE_VALUE',
-      reissue_fee_waived: true
+      reissue_fee_waived: true,
+      supports_cbdc_escrow: true
     };
   }
 }
@@ -48,23 +50,29 @@ class MockOperatorService {
 class MockPaymentService {
   static async processPayment(amount, paymentMethod = 'UPI/Card') {
     await new Promise((resolve) => setTimeout(resolve, 300));
+    const isCBDC = paymentMethod === 'CBDC' || paymentMethod === 'e-Rupee';
     return {
       success: true,
-      paymentId: `pid_${Math.random().toString(36).substring(2, 11)}`,
-      referenceId: `PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      paymentId: isCBDC ? `cbdc_tx_${Math.random().toString(36).substring(2, 11)}` : `pid_${Math.random().toString(36).substring(2, 11)}`,
+      referenceId: isCBDC ? `eINR-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}` : `PAY-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       amount,
-      paymentMethod,
+      paymentMethod: isCBDC ? 'e-Rupee (RBI CBDC)' : paymentMethod,
+      isCBDC,
       timestamp: new Date().toISOString()
     };
   }
 
-  static async processRefund(amount, sellerId) {
+  static async processRefund(amount, sellerId, paymentMethod = 'UPI/Card') {
     await new Promise((resolve) => setTimeout(resolve, 250));
+    const isCBDC = paymentMethod === 'CBDC' || paymentMethod === 'e-Rupee' || (typeof paymentMethod === 'string' && paymentMethod.includes('CBDC'));
     return {
       success: true,
-      refundId: `rf_${Math.random().toString(36).substring(2, 11)}`,
-      referenceId: `REF-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      refundId: isCBDC ? `cbdc_rf_${Math.random().toString(36).substring(2, 11)}` : `rf_${Math.random().toString(36).substring(2, 11)}`,
+      referenceId: isCBDC ? `eINR-SETTLE-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}` : `REF-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       amount,
+      paymentMethod: isCBDC ? 'e-Rupee (RBI CBDC)' : 'UPI/Bank',
+      isCBDC,
+      settlementSpeed: isCBDC ? 'Instant T+0' : 'T+2 Business Days',
       status: 'COMPLETED',
       timestamp: new Date().toISOString()
     };
@@ -219,8 +227,9 @@ class ResaleWorkflowService {
       throw new Error('You cannot purchase your own listed ticket');
     }
 
-    // Process mock payment
-    const paymentResult = await MockPaymentService.processPayment(listing.resalePrice, paymentMethod || 'UPI');
+    // Process payment
+    const isCBDC = paymentMethod === 'CBDC' || paymentMethod === 'e-Rupee';
+    const paymentResult = await MockPaymentService.processPayment(listing.resalePrice, isCBDC ? 'CBDC' : paymentMethod || 'UPI');
     const transactionId = uuidv4();
     const transactionNumber = `SR-${Math.floor(10000 + Math.random() * 90000)}`;
     const nowIso = new Date().toISOString();
@@ -251,9 +260,22 @@ class ResaleWorkflowService {
       {
         sql: `INSERT INTO payments (id, transactionId, amount, status, paymentMethod, referenceId, createdAt)
               VALUES (?, ?, ?, 'COMPLETED', ?, ?, ?)`,
-        params: [uuidv4(), transactionId, listing.resalePrice, paymentMethod || 'UPI', paymentResult.referenceId, nowIso]
+        params: [uuidv4(), transactionId, listing.resalePrice, isCBDC ? 'e-Rupee (RBI CBDC)' : paymentMethod || 'UPI', paymentResult.referenceId, nowIso]
       }
     ]);
+
+    // If payment method is CBDC / e-Rupee, lock funds into programmable smart contract escrow
+    let cbdcEscrow = null;
+    if (isCBDC) {
+      cbdcEscrow = CBDCEscrowService.lockTokens({
+        transactionId,
+        listingId,
+        amount: listing.resalePrice,
+        buyerIdentifier: buyerId,
+        sellerIdentifier: listing.sellerId,
+        operatorIdentifier: listing.operatorName
+      });
+    }
 
     // Send notification to operators
     const operators = DatabaseService.query(`SELECT id FROM users WHERE role = 'operator'`);
@@ -264,7 +286,7 @@ class ResaleWorkflowService {
       `, [
         uuidv4(),
         op.id,
-        `🔄 New ticket reissue request #${transactionNumber} requires approval for Seat ${listing.seatNumber}.`,
+        `🔄 New ticket reissue request #${transactionNumber} requires approval for Seat ${listing.seatNumber}${isCBDC ? ' (e-Rupee Escrow Locked)' : ''}.`,
         nowIso
       ]);
     }
@@ -272,6 +294,7 @@ class ResaleWorkflowService {
     return {
       transaction: DatabaseService.get(`SELECT * FROM resale_transactions WHERE id = ?`, [transactionId]),
       paymentResult,
+      cbdcEscrow,
       listing
     };
   }
@@ -339,8 +362,15 @@ class ResaleWorkflowService {
       color: { dark: '#0f172a', light: '#ffffff' }
     });
 
+    // Check payment method of transaction
+    const initialPayment = DatabaseService.get(`SELECT * FROM payments WHERE transactionId = ?`, [tx.id]);
+    const isCBDC = initialPayment?.paymentMethod?.includes('CBDC') || initialPayment?.paymentMethod?.includes('e-Rupee');
+
     // Process seller refund
-    const refundResult = await MockPaymentService.processRefund(tx.sellerRefundAmount, tx.sellerId);
+    const refundResult = await MockPaymentService.processRefund(tx.sellerRefundAmount, tx.sellerId, isCBDC ? 'CBDC' : 'UPI/Bank');
+
+    // Execute atomic e-Rupee smart contract settlement if CBDC escrow exists
+    const cbdcSettlement = isCBDC ? CBDCEscrowService.executeAtomicSettlement(tx.id, opResp.operator_auth_code) : null;
 
     const newTicketId = uuidv4();
     const refundId = uuidv4();
@@ -391,7 +421,7 @@ class ResaleWorkflowService {
         params: [
           uuidv4(),
           tx.sellerId,
-          `🎉 Your seat ${tx.seatNumber} has been resold. ₹${tx.sellerRefundAmount} refund initiated and completed to your account (Ref: ${refundResult.referenceId}).`,
+          `🎉 Your seat ${tx.seatNumber} has been resold. ₹${tx.sellerRefundAmount} ${isCBDC ? 'e-Rupee instant T+0 settlement' : 'refund'} completed to your account (Ref: ${refundResult.referenceId}).`,
           nowIso
         ]
       },
@@ -413,6 +443,7 @@ class ResaleWorkflowService {
       transaction: DatabaseService.get(`SELECT * FROM resale_transactions WHERE id = ?`, [tx.id]),
       newTicket: DatabaseService.get(`SELECT * FROM tickets WHERE id = ?`, [newTicketId]),
       refund: DatabaseService.get(`SELECT * FROM refunds WHERE id = ?`, [refundId]),
+      cbdcSettlement,
       operatorAuth: opResp.operator_auth_code
     };
   }
@@ -436,7 +467,12 @@ class ResaleWorkflowService {
     const nowIso = new Date().toISOString();
 
     // Process refund to buyer
-    const refundResult = await MockPaymentService.processRefund(tx.resalePrice, tx.buyerId);
+    const initialPayment = DatabaseService.get(`SELECT * FROM payments WHERE transactionId = ?`, [tx.id]);
+    const isCBDC = initialPayment?.paymentMethod?.includes('CBDC') || initialPayment?.paymentMethod?.includes('e-Rupee');
+    const refundResult = await MockPaymentService.processRefund(tx.resalePrice, tx.buyerId, isCBDC ? 'CBDC' : 'UPI/Bank');
+    if (isCBDC) {
+      CBDCEscrowService.refundToBuyer(tx.id);
+    }
     const refundId = uuidv4();
 
     DatabaseService.transaction([

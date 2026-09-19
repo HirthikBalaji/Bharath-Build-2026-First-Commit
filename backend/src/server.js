@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { DatabaseService } = require('./db');
+const { CBDCEscrowService } = require('./cbdc.service');
 const {
   MockOperatorService,
   MockPaymentService,
@@ -538,7 +539,8 @@ app.get('/api/operator/reissues', requireOperator, (req, res) => {
         : null,
       refunds: r.refundId
         ? [{ id: r.refundId, status: r.refundStatus, referenceId: r.refundRef, amount: r.sellerRefundAmount }]
-        : []
+        : [],
+      cbdcEscrow: CBDCEscrowService.getContractByTransaction(r.id)
     }));
 
     res.json(formatted);
@@ -648,6 +650,28 @@ app.post('/api/digilocker/verify-otp', (req, res) => {
         idType: 'Aadhaar Card'
       }
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 7B-2. RBI CBDC (e-RUPEE) PROGRAMMABLE ESCROW ENDPOINTS
+// ==========================================
+app.get('/api/cbdc/contracts', (req, res) => {
+  try {
+    const contracts = CBDCEscrowService.getAllContracts();
+    res.json(contracts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/cbdc/contracts/:transactionId', (req, res) => {
+  try {
+    const contract = CBDCEscrowService.getContractByTransaction(req.params.transactionId);
+    if (!contract) return res.status(404).json({ error: 'No CBDC smart contract for this transaction' });
+    res.json(contract);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

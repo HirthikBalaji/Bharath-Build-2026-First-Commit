@@ -221,6 +221,22 @@ export function App() {
     }
   };
 
+  const handleResetDemo = async () => {
+    try {
+      const res = await fetch('/demo/reset', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reset demo state');
+      alert('Demo state reset successfully to pristine initial database.');
+      fetchUsers();
+      fetchBuses();
+      fetchReissues();
+      fetchTransactions();
+      if (currentUser) fetchTickets(currentUser.id);
+    } catch (err: any) {
+      alert(`Reset Error: ${err.message}`);
+    }
+  };
+
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (

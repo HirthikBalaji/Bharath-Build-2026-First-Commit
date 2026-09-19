@@ -168,6 +168,8 @@ export interface ReissueRequestItem {
     phone: string;
     govIdType: string;
     govIdNumber: string;
+    digilockerVerified?: boolean;
+    digilockerTxnId?: string | null;
     buyerEmail: string;
   };
   newTicket?: {

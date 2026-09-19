@@ -149,8 +149,19 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({ reissues, 
                       </div>
 
                       <div className="rounded-xl border border-coach/40 bg-coach/[0.04] p-5 dark:border-accent/40">
-                        <p className="kicker text-accent">Onto the manifest</p>
-                        <p className="mt-4 text-xl font-semibold text-ink">{r.newPassenger.name}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="kicker text-accent">Onto the manifest</p>
+                          {r.newPassenger.digilockerVerified ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[0.6875rem] font-bold text-accent border border-accent/30">
+                              ✓ DigiLocker Verified
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-marigold/15 px-2 py-0.5 text-[0.6875rem] font-medium text-marigoldink">
+                              Unverified ID
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-3 text-xl font-semibold text-ink">{r.newPassenger.name}</p>
                         <dl className="mt-4 space-y-2 text-sm">
                           <Row k="Age · gender" v={`${r.newPassenger.age} · ${r.newPassenger.gender}`} />
                           <Row k="Phone" v={<span className="code">{r.newPassenger.phone}</span>} />

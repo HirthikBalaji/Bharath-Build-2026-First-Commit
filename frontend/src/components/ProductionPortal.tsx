@@ -87,7 +87,7 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
   const fetchLiveBuses = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/buses/search');
+      const res = await fetch('/api/buses/search?live=true');
       const data = await res.json();
       setBuses(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -173,9 +173,28 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
     }
   };
 
+  const loadSeatsForBus = async (busId: string) => {
+    try {
+      const res = await fetch(`/api/buses/${busId}/seats`);
+      if (res.ok) {
+        const data = await res.json();
+        const available = (Array.isArray(data) ? data : []).filter((s: any) => s.status === 'AVAILABLE');
+        setDirectSeats(available);
+        if (available.length > 0) {
+          setSelectedSeatNumber(available[0].seatNumber);
+        } else {
+          setSelectedSeatNumber('');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching seats:', err);
+    }
+  };
+
   const handleStartDirectBooking = (bus: Bus) => {
     setSelectedBusForDirect(bus);
     setDirectBookingSuccess(null);
+    loadSeatsForBus(bus.id);
     setSubTab('direct_booking');
   };
 
@@ -365,7 +384,7 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
               <BusFront className="h-12 w-12 text-ink3 mx-auto mb-3" />
               <h3 className="text-lg font-bold text-ink">Fleet Inventory is Empty</h3>
               <p className="text-sm text-ink2 mt-1 max-w-md mx-auto">
-                No coaches have been registered yet. Sign in as an operator (<code className="font-mono text-xs bg-surface2 px-1.5 py-0.5 rounded">ops@swiftbus.in</code>) to add buses, schedule departures, and define seating layouts.
+                No coaches have been registered yet. Authenticate as an authorized fleet operator to publish coaches, configure layouts, and schedule departures.
               </p>
               {isOperator ? (
                 <Button className="mt-5" onClick={() => setSubTab('fleet')}>
@@ -628,6 +647,12 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
                   onChange={(e) => {
                     const b = buses.find((x) => x.id === e.target.value);
                     setSelectedBusForDirect(b || null);
+                    if (b) {
+                      loadSeatsForBus(b.id);
+                    } else {
+                      setDirectSeats([]);
+                      setSelectedSeatNumber('');
+                    }
                   }}
                   required
                 >
@@ -642,14 +667,29 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <label className="block">
-                  <span className="text-xs font-semibold text-ink2 block mb-1">Berth / Seat Number</span>
-                  <input
-                    required
-                    placeholder="e.g. U1, L2"
-                    value={selectedSeatNumber}
-                    onChange={(e) => setSelectedSeatNumber(e.target.value.toUpperCase())}
-                    className="field code uppercase"
-                  />
+                  <span className="text-xs font-semibold text-ink2 block mb-1">Available Berth / Seat</span>
+                  {directSeats.length > 0 ? (
+                    <select
+                      required
+                      value={selectedSeatNumber}
+                      onChange={(e) => setSelectedSeatNumber(e.target.value)}
+                      className="field font-mono"
+                    >
+                      {directSeats.map((s) => (
+                        <option key={s.id || s.seatNumber} value={s.seatNumber}>
+                          Seat {s.seatNumber} ({seatTypeLabel(s.seatType)})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      required
+                      placeholder="e.g. U1, L2"
+                      value={selectedSeatNumber}
+                      onChange={(e) => setSelectedSeatNumber(e.target.value.toUpperCase())}
+                      className="field code uppercase"
+                    />
+                  )}
                 </label>
                 <label className="block">
                   <span className="text-xs font-semibold text-ink2 block mb-1">Passenger Name</span>
@@ -758,10 +798,9 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
                   <input
                     value={testOtp}
                     onChange={(e) => setTestOtp(e.target.value)}
-                    placeholder="123456"
+                    placeholder="Enter 6-digit OTP"
                     className="field code text-center tracking-widest text-lg"
                   />
-                  <span className="text-[0.6875rem] text-ink3 mt-1 block">Default Sandbox OTP: 123456</span>
                 </label>
                 <Button onClick={handleVerifyTestKyc} loading={isTestingKyc} className="w-full">
                   Verify & Sign Digital Consent Token

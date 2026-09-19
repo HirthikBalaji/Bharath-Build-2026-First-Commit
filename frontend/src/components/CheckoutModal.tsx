@@ -231,9 +231,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 />
               </div>
             </div>
-            <p className="text-[10px] text-slate-400 font-mono">
-              Privacy shield: Sellers never see your Government ID or phone number.
-            </p>
+            <div className="p-2.5 bg-emerald-50/60 rounded-xl border border-emerald-100 flex items-center justify-between text-[11px] text-emerald-950 font-medium">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>DPDP Act 2023: Identity masked (`XXXX XXXX 4821`). Hidden from seller.</span>
+              </span>
+              <span className="text-[10px] font-mono text-emerald-700 font-bold">256-BIT ENCRYPTED</span>
+            </div>
           </div>
 
           {/* Clear Price Breakdown (Section 6) */}

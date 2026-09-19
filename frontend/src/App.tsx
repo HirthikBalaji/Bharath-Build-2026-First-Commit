@@ -359,15 +359,43 @@ export function App() {
       />
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div>
-            <span className="font-bold text-slate-800">SeatRelay</span> — Face-Value Bus Ticket Resale Protocol
+      <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-10 text-xs">
+        <div className="max-w-7xl mx-auto px-4 space-y-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-6">
+            <div className="flex items-center gap-3">
+              <img src="/logo.svg" alt="SeatRelay" className="h-8 w-8 rounded-lg" />
+              <div>
+                <span className="text-base font-black text-white">Seat<span className="text-emerald-500">Relay</span></span>
+                <p className="text-[11px] text-slate-400">Authorized Passenger Reissuance & Resale Platform</p>
+              </div>
+            </div>
+
+            {/* Compliance badges */}
+            <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono">
+              <span className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-emerald-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>DPDP Act 2023 Compliant</span>
+              </span>
+              <span className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-slate-300">
+                256-Bit Escrow Vault
+              </span>
+              <span className="px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-amber-300">
+                Zero Scalping Policy
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-4 text-[11px] font-mono">
-            <span>Operator: SwiftBus Express</span>
-            <span>Escrow: Verified</span>
-            <span>Price: Original Fare Bound</span>
+
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
+            <p>
+              © {new Date().getFullYear()} SeatRelay Technologies Inc. Built for carrier-integrated reissuance. All passenger tickets are verified by carrier GDS systems prior to boarding.
+            </p>
+            <div className="flex items-center gap-4">
+              <span className="hover:text-slate-300 cursor-pointer">Carrier Manifest Terms</span>
+              <span>•</span>
+              <span className="hover:text-slate-300 cursor-pointer">Data Privacy & ID Masking</span>
+              <span>•</span>
+              <span className="hover:text-slate-300 cursor-pointer">Escrow Settlement</span>
+            </div>
           </div>
         </div>
       </footer>

@@ -46,6 +46,41 @@ function verifyToken(token) {
   }
 }
 
+function parseAuth(req) {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return verifyToken(authHeader.split(' ')[1]);
+  }
+  // Fallback support for demo header or query
+  const userId = req.headers['x-user-id'] || req.query.userId;
+  if (userId) {
+    const u = DatabaseService.get(`SELECT id, email, role FROM users WHERE id = ?`, [userId]);
+    if (u) return { userId: u.id, email: u.email, role: u.role };
+  }
+  return null;
+}
+
+function requireAuth(req, res, next) {
+  const auth = parseAuth(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  req.auth = auth;
+  next();
+}
+
+function requireOperator(req, res, next) {
+  const auth = parseAuth(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (auth.role !== 'operator') {
+    return res.status(403).json({ error: 'Forbidden: Operator privileges required' });
+  }
+  req.auth = auth;
+  next();
+}
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -143,11 +178,12 @@ app.get('/api/buses/search', (req, res) => {
 // ==========================================
 // 2. MY TICKETS (SELLER / BUYER)
 // ==========================================
-app.get('/api/tickets/my', (req, res) => {
+app.get('/api/tickets/my', requireAuth, (req, res) => {
   try {
-    const userId = req.query.userId || req.headers['x-user-id'];
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    const userId = req.query.userId || req.headers['x-user-id'] || req.auth.userId;
+
+    if (req.auth.userId !== userId && req.auth.role !== 'operator') {
+      return res.status(403).json({ error: 'Unauthorized: Cannot view another traveller’s tickets' });
     }
 
     const tickets = DatabaseService.query(`
@@ -248,12 +284,14 @@ app.get('/api/tickets/:id', (req, res) => {
 // ==========================================
 // 3. SELLER RESALE LISTING
 // ==========================================
-app.post('/api/tickets/:id/list', async (req, res) => {
+app.post('/api/tickets/:id/list', requireAuth, async (req, res) => {
   try {
     const ticketId = req.params.id;
-    const { sellerId } = req.body;
+    const sellerId = req.body.sellerId || req.auth.userId;
 
-    if (!sellerId) return res.status(400).json({ error: 'sellerId is required' });
+    if (req.auth.userId !== sellerId && req.auth.role !== 'operator') {
+      return res.status(403).json({ error: 'Unauthorized: Cannot list tickets for another user' });
+    }
 
     const result = await ResaleWorkflowService.listTicketForResale(ticketId, sellerId);
     res.status(201).json(result);
@@ -263,12 +301,14 @@ app.post('/api/tickets/:id/list', async (req, res) => {
 });
 
 // DELETE /api/resale/:id (Cancel resale listing)
-app.delete('/api/resale/:id', async (req, res) => {
+app.delete('/api/resale/:id', requireAuth, async (req, res) => {
   try {
     const listingId = req.params.id;
-    const { sellerId } = req.body;
+    const sellerId = req.body.sellerId || req.auth.userId;
 
-    if (!sellerId) return res.status(400).json({ error: 'sellerId is required' });
+    if (req.auth.userId !== sellerId && req.auth.role !== 'operator') {
+      return res.status(403).json({ error: 'Unauthorized: Cannot cancel listings for another user' });
+    }
 
     const result = await ResaleWorkflowService.cancelListing(listingId, sellerId);
     res.json(result);
@@ -400,7 +440,7 @@ app.post('/api/payments/mock', async (req, res) => {
 // ==========================================
 // 6. OPERATOR DASHBOARD & REISSUE APPROVAL
 // ==========================================
-app.get('/api/operator/reissues', (req, res) => {
+app.get('/api/operator/reissues', requireOperator, (req, res) => {
   try {
     const reissues = DatabaseService.query(`
       SELECT tx.*, l.originalPrice as fare, l.resalePrice,
@@ -482,19 +522,19 @@ app.get('/api/operator/reissues', (req, res) => {
   }
 });
 
-app.post('/api/operator/reissues/:id/approve', async (req, res) => {
+app.post('/api/operator/reissues/:id/approve', requireOperator, async (req, res) => {
   try {
     const transactionId = req.params.id;
-    const { operatorUserId } = req.body;
+    const operatorUserId = req.auth.userId;
 
-    const result = await ResaleWorkflowService.approveReissue(transactionId, operatorUserId || 'operator');
+    const result = await ResaleWorkflowService.approveReissue(transactionId, operatorUserId);
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-app.post('/api/operator/reissues/:id/reject', async (req, res) => {
+app.post('/api/operator/reissues/:id/reject', requireOperator, async (req, res) => {
   try {
     const transactionId = req.params.id;
     const { reason } = req.body;

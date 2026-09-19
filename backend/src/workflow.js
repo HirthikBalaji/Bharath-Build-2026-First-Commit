@@ -416,7 +416,12 @@ class ResaleWorkflowService {
    * Operator Rejection Workflow
    */
   static async rejectReissue(transactionId, reason = 'Operator rejected request') {
-    const tx = DatabaseService.get(`SELECT * FROM resale_transactions WHERE id = ?`, [transactionId]);
+    const tx = DatabaseService.get(`
+      SELECT tx.*, l.ticketId, l.resalePrice
+      FROM resale_transactions tx
+      JOIN resale_listings l ON tx.listingId = l.id
+      WHERE tx.id = ?
+    `, [transactionId]);
     if (!tx) throw new Error('Transaction not found');
     if (tx.status !== 'REISSUE_PENDING') {
       throw new Error(`Cannot reject. Status: ${tx.status}`);
@@ -424,6 +429,10 @@ class ResaleWorkflowService {
 
     const listing = DatabaseService.get(`SELECT * FROM resale_listings WHERE id = ?`, [tx.listingId]);
     const nowIso = new Date().toISOString();
+
+    // Process refund to buyer
+    const refundResult = await MockPaymentService.processRefund(tx.resalePrice, tx.buyerId);
+    const refundId = uuidv4();
 
     DatabaseService.transaction([
       {
@@ -439,18 +448,23 @@ class ResaleWorkflowService {
         params: [nowIso, listing.ticketId]
       },
       {
+        sql: `INSERT INTO refunds (id, transactionId, sellerId, amount, status, referenceId, createdAt, completedAt)
+              VALUES (?, ?, ?, ?, 'COMPLETED', ?, ?, ?)`,
+        params: [refundId, tx.id, tx.buyerId, tx.resalePrice, refundResult.referenceId, nowIso, nowIso]
+      },
+      {
         sql: `INSERT INTO notifications (id, userId, title, message, type, isRead, createdAt)
               VALUES (?, ?, 'Reissue Rejected by Operator', ?, 'WARNING', 0, ?)`,
         params: [
           uuidv4(),
           tx.buyerId,
-          `The operator could not reissue this ticket: ${reason}. Your payment will be refunded immediately.`,
+          `The operator could not reissue this ticket: ${reason}. Your payment of ₹${tx.resalePrice} has been refunded immediately (Ref: ${refundResult.referenceId}).`,
           nowIso
         ]
       }
     ]);
 
-    return { success: true };
+    return { success: true, refundReference: refundResult.referenceId };
   }
 }
 

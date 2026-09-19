@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String             @id @default(uuid())
+  name         String
+  email        String             @unique
+  phone        String
+  role         String             // "seller" | "buyer" | "operator" | "admin"
+  createdAt    DateTime           @default(now())
+  tickets      Ticket[]
+  listings     ResaleListing[]
+  transactions ResaleTransaction[] @relation("BuyerTransactions")
+  refunds      Refund[]
+}
+
+model Operator {
+  id                         String   @id @default(uuid())
+  name                       String
+  code                       String   @unique
+  contactEmail               String
+  supportsResale             Boolean  @default(true)
+  supportsPassengerReissue   Boolean  @default(true)
+  minimumResaleWindowMinutes Int      @default(60)
+  maximumResalePrice         String   @default("FACE_VALUE")
+  createdAt                  DateTime @default(now())
+  buses                      Bus[]
+}
+
+model Bus {
+  id            String    @id @default(uuid())
+  operatorId    String
+  operator      Operator  @relation(fields: [operatorId], references: [id])
+  busNumber     String
+  busType       String    @default("AC Sleeper (2+1)")
+  routeFrom     String
+  routeTo       String
+  departureTime DateTime
+  arrivalTime   DateTime
+  travelDate    String    // e.g. "2026-09-19"
+  baseFare      Float
+  createdAt     DateTime  @default(now())
+  seats         Seat[]
+  tickets       Ticket[]
+}
+
+model Seat {
+  id         String   @id @default(uuid())
+  busId      String
+  bus        Bus      @relation(fields: [busId], references: [id])
+  seatNumber String   // e.g. "U12"
+  seatType   String   // "UPPER_BERTH", "LOWER_BERTH", "SEATER"
+  status     String   @default("AVAILABLE") // "AVAILABLE" | "BOOKED" | "HELD"
+  tickets    Ticket[]
+}
+
+model Ticket {
+  id               String          @id @default(uuid())
+  ticketNumber     String          @unique // e.g. "SB-92831", "SR-92831"
+  userId           String
+  user             User            @relation(fields: [userId], references: [id])
+  busId            String
+  bus              Bus             @relation(fields: [busId], references: [id])
+  seatId           String
+  seat             Seat            @relation(fields: [seatId], references: [id])
+  passengerName    String
+  passengerAge     Int
+  passengerGender  String
+  passengerPhone   String?
+  govIdType        String?
+  govIdNumber      String?
+  fare             Float
+  status           String          @default("CONFIRMED") // "CONFIRMED" | "LISTED_FOR_RESALE" | "SOLD" | "REISSUED" | "INVALIDATED" | "CANCELLED"
+  qrCode           String?
+  issuedAt         DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  
+  // Resale relations
+  resaleListings   ResaleListing[]
+  reissuedFromId   String?         // Reference to previous ticket if this was reissued
+  reissuedTickets  ResaleTransaction[] @relation("NewTicket")
+}
+
+model ResaleListing {
+  id            String              @id @default(uuid())
+  listingNumber String              @unique // e.g. "RL-10482"
+  ticketId      String
+  ticket        Ticket              @relation(fields: [ticketId], references: [id])
+  sellerId      String
+  seller        User                @relation(fields: [sellerId], references: [id])
+  originalPrice Float
+  resalePrice   Float               // Must strictly be <= originalPrice
+  platformFee   Float               @default(0.0)
+  status        String              @default("LISTED") // "LISTED" | "RESERVED" | "PURCHASED" | "COMPLETED" | "CANCELLED"
+  createdAt     DateTime            @default(now())
+  expiresAt     DateTime?
+  transactions  ResaleTransaction[]
+}
+
+model ResaleTransaction {
+  id                 String         @id @default(uuid())
+  transactionNumber  String         @unique // e.g. "SR-10482"
+  listingId          String
+  listing            ResaleListing  @relation(fields: [listingId], references: [id])
+  buyerId            String
+  buyer              User           @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  newTicketId        String?
+  newTicket          Ticket?        @relation("NewTicket", fields: [newTicketId], references: [id])
+  buyerPassengerName String
+  buyerPassengerAge  Int
+  buyerPassengerGender String
+  buyerPhone         String
+  buyerGovIdType     String
+  buyerGovIdNumber   String         // Masked on read
+  status             String         @default("PURCHASED") 
+  // Progression: LISTED -> PURCHASED -> PAYMENT_CONFIRMED -> REISSUE_PENDING -> OPERATOR_APPROVED -> TICKET_REISSUED -> ORIGINAL_TICKET_INVALIDATED -> SELLER_REFUND_INITIATED -> COMPLETED (or REJECTED/FAILED)
+  sellerRefundAmount Float
+  platformFee        Float          @default(0.0)
+  createdAt          DateTime       @default(now())
+  completedAt        DateTime?
+  payments           Payment[]
+  refunds            Refund[]
+}
+
+model Payment {
+  id            String            @id @default(uuid())
+  transactionId String
+  transaction   ResaleTransaction @relation(fields: [transactionId], references: [id])
+  amount        Float
+  status        String            @default("COMPLETED") // "PENDING" | "COMPLETED" | "FAILED"
+  paymentMethod String            @default("UPI/Card")
+  referenceId   String            @unique // e.g. "PAY-XXXX"
+  createdAt     DateTime          @default(now())
+}
+
+model Refund {
+  id            String            @id @default(uuid())
+  transactionId String
+  transaction   ResaleTransaction @relation(fields: [transactionId], references: [id])
+  sellerId      String
+  seller        User              @relation(fields: [sellerId], references: [id])
+  amount        Float
+  status        String            @default("INITIATED") // "INITIATED" | "COMPLETED" | "FAILED"
+  referenceId   String            @unique // e.g. "REF-XXXX"
+  createdAt     DateTime          @default(now())
+  completedAt   DateTime?
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String   // "INFO" | "SUCCESS" | "WARNING" | "ACTION_REQUIRED"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

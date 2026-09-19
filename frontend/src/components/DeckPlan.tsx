@@ -257,7 +257,7 @@ export const ManifestSlip: React.FC<{ phase: RelayPhase; className?: string }> =
           <p className="mt-1 text-[0.9375rem] font-semibold">SwiftBus Express · KA-01-F-8899</p>
         </div>
         <div className="text-right">
-          <p className="code text-[0.6875rem] opacity-80">BLR → MAA</p>
+          <p className="code whitespace-nowrap text-[0.6875rem] opacity-80">BLR → MAA</p>
           <p className="code mt-1 text-sm font-semibold">22:30</p>
         </div>
       </div>

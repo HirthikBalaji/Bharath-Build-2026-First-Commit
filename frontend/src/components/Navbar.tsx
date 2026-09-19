@@ -143,12 +143,15 @@ export const Navbar: React.FC<NavbarProps> = ({
         transition={{ duration: 0.45, ease: EASE_OUT }}
       >
         <div className="mx-auto max-w-[1320px] pr-9 sm:pr-11">
-          <div
-            className={cx(
-              'flex h-16 items-center justify-between gap-4 rounded-2xl pl-3 pr-2 transition-[background-color,box-shadow,border-color] duration-500',
-              raised || menu ? 'border border-line bg-surface/85 shadow-lift backdrop-blur-xl' : 'border border-transparent'
-            )}
-          >
+          <div className="relative flex h-16 items-center justify-between gap-4 rounded-2xl pl-3 pr-2">
+            {/* The bar's glass lives on its own layer and only fades; toggling blur on the bar itself left paint streaks in Chrome */}
+            <span
+              aria-hidden
+              className={cx(
+                'pointer-events-none absolute inset-0 -z-10 rounded-2xl border border-line bg-surface/85 shadow-lift backdrop-blur-xl transition-opacity duration-500',
+                raised || menu ? 'opacity-100' : 'opacity-0'
+              )}
+            />
             <button onClick={() => go('home')} className="rounded-lg p-1" aria-label="SeatRelay home">
               <Wordmark size={32} />
             </button>

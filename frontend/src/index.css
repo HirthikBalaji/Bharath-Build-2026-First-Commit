@@ -25,6 +25,25 @@
   --success: 16 118 84;
   --shadow: 12 30 22;
   --lamp: 0;
+
+  /* Opening scene: the highway by day */
+  --sky-top: 188 219 205;
+  --sky-bottom: 236 242 234;
+  --hill-far: 186 209 197;
+  --hill-mid: 143 183 163;
+  --hill-near: 86 144 116;
+  --ground: 42 101 78;
+  --city: 170 196 183;
+  --road: 42 55 50;
+  --road-edge: 226 233 225;
+  --road-line: 240 164 26;
+  --tree: 33 90 67;
+  --tree-2: 55 118 91;
+  --bus-body: 13 74 56;
+  --bus-window: 205 228 216;
+  --tyre: 20 28 25;
+  --day: 1;
+  --night: 0;
 }
 
 .dark {
@@ -46,6 +65,25 @@
   --success: 104 204 160;
   --shadow: 0 0 0;
   --lamp: 1;
+
+  /* Opening scene: the same highway at night */
+  --sky-top: 3 8 7;
+  --sky-bottom: 16 40 34;
+  --hill-far: 12 31 26;
+  --hill-mid: 15 41 33;
+  --hill-near: 18 53 42;
+  --ground: 9 27 22;
+  --city: 10 25 21;
+  --road: 10 17 15;
+  --road-edge: 42 58 51;
+  --road-line: 247 180 55;
+  --tree: 7 28 22;
+  --tree-2: 11 38 30;
+  --bus-body: 24 88 68;
+  --bus-window: 247 192 96;
+  --tyre: 4 6 5;
+  --day: 0;
+  --night: 1;
 }
 
 @layer base {

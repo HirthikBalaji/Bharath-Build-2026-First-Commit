@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { User } from '../types';
 import { DeckPlan, ManifestSlip, RelayPhase } from './DeckPlan';
+import { HeroScene } from './HeroScene';
 import { BerthGlyph, Button, cx, EASE_OUT, Pill, RevealText, Rise } from './ui';
 
 interface HomePageProps {
@@ -89,42 +90,56 @@ const useRelayLoop = (active: boolean) => {
   return phase;
 };
 
-const Hero: React.FC<{ onSearch: () => void; onRelease: () => void }> = ({ onSearch, onRelease }) => {
+const Hero: React.FC<{ onSearch: () => void; onRelease: () => void; phase: RelayPhase }> = ({ onSearch, onRelease, phase }) => {
   const ref = useRef<HTMLElement>(null);
-  const inView = useInView(ref, { amount: 0.25 });
-  const phase = useRelayLoop(inView);
   const { scrollYProgress } = useScroll({ target: ref, offset: ['start start', 'end start'] });
-  const coachX = useTransform(scrollYProgress, [0, 1], ['0%', '9%']);
-  const textY = useTransform(scrollYProgress, [0, 1], [0, -80]);
-  const textOpacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
+  const isDesktop = useIsDesktop();
+  // The words drift up and fade only on desktop; on a phone the hero is taller than the screen and must stay readable.
+  const textY = useTransform(scrollYProgress, [0, 1], isDesktop ? [0, -90] : [0, 0]);
+  const textOpacity = useTransform(scrollYProgress, [0, 0.6], isDesktop ? [1, 0] : [1, 1]);
 
   return (
-    <section ref={ref} className="relative overflow-hidden pb-16 pt-28 sm:pt-36" id="top">
-      <Container>
-        <motion.div style={{ y: textY, opacity: textOpacity }}>
-          <motion.p
-            className="kicker flex items-center gap-2.5 text-accent"
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: EASE_OUT }}
-          >
-            <BerthGlyph className="h-3.5 w-6" state="relay" />
-            Operator-authorised seat transfer
-          </motion.p>
-          <RevealText
-            as="h1"
-            text={'Plans change.\nThe seat travels on.'}
-            className="display mt-6 text-[clamp(2.6rem,7.4vw,5.75rem)] text-ink"
-            delay={0.25}
-            stagger={0.08}
-            accentWords={[4]}
-          />
-        </motion.div>
+    <section ref={ref} id="top" className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
+      <HeroScene targetRef={ref} />
 
-        <div className="relative mt-10 lg:mt-12">
-          <div className="max-w-xl lg:max-w-[34rem]">
+      {/* Acrylic: a light frost between the landscape and the words, clearing toward the road */}
+      <div
+        className="pointer-events-none absolute inset-0 -z-[5]"
+        aria-hidden
+        style={{
+          backdropFilter: 'blur(3px) saturate(1.12)',
+          WebkitBackdropFilter: 'blur(3px) saturate(1.12)',
+          background:
+            'linear-gradient(102deg, rgb(var(--bg) / 0.66) 0%, rgb(var(--bg) / 0.46) 36%, rgb(var(--bg) / 0.16) 66%, rgb(var(--bg) / 0.06) 100%)',
+          maskImage: 'linear-gradient(180deg, #000 0%, #000 64%, transparent 80%)',
+          WebkitMaskImage: 'linear-gradient(180deg, #000 0%, #000 64%, transparent 80%)',
+        }}
+      />
+      {/* the landscape ends here, before the deck plan below */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-[4] h-20 bg-gradient-to-b from-transparent to-bg" aria-hidden />
+
+      <Container className="relative flex flex-1 flex-col pb-[26vh] pt-32 sm:pt-36">
+        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-10">
+          <motion.div style={{ y: textY, opacity: textOpacity }}>
+            <motion.p
+              className="kicker flex items-center gap-2.5 text-accent"
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2, ease: EASE_OUT }}
+            >
+              <BerthGlyph className="h-3.5 w-6" state="relay" />
+              Operator-authorised seat transfer
+            </motion.p>
+            <RevealText
+              as="h1"
+              text={'Plan changes,\nyour seat finds\nits next rider.'}
+              className="display mt-6 text-[clamp(2.5rem,6vw,4.6rem)] text-ink"
+              delay={0.25}
+              stagger={0.07}
+              accentWords={[6, 7]}
+            />
             <Rise delay={0.7}>
-              <p className="text-[1.1875rem] leading-relaxed text-ink2">
+              <p className="mt-8 max-w-[34rem] text-[1.1875rem] leading-relaxed text-ink2">
                 Can't make the trip? Release your seat. Someone on the same route takes it at the exact fare, the operator reissues it in their name,
                 and your money comes back once it sells.
               </p>
@@ -135,14 +150,14 @@ const Hero: React.FC<{ onSearch: () => void; onRelease: () => void }> = ({ onSea
                   <Search className="h-[18px] w-[18px]" />
                   Find a seat
                 </Button>
-                <Button size="lg" variant="ghost" onClick={onRelease}>
+                <Button size="lg" variant="ghost" onClick={onRelease} className="bg-surface/40 backdrop-blur-sm">
                   Release my seat
                   <ArrowRight className="h-[18px] w-[18px]" />
                 </Button>
               </div>
             </Rise>
             <Rise delay={1}>
-              <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink2">
+              <ul className="mt-7 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-ink2">
                 {['Exact fare, never more', "Reissued in the buyer's name", 'Refund only when it sells'].map((t) => (
                   <li key={t} className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-accent" strokeWidth={2.25} />
@@ -151,10 +166,10 @@ const Hero: React.FC<{ onSearch: () => void; onRelease: () => void }> = ({ onSea
                 ))}
               </ul>
             </Rise>
-          </div>
+          </motion.div>
 
           <motion.div
-            className="relative z-10 mx-auto mt-12 w-full max-w-[380px] lg:absolute lg:right-0 lg:top-[-2.5rem] lg:mt-0 lg:w-[360px]"
+            className="relative z-10 mx-auto w-full max-w-[380px] lg:mx-0"
             initial={{ opacity: 0, y: 40, rotate: 2 }}
             animate={{ opacity: 1, y: 0, rotate: 0 }}
             transition={{ duration: 1.1, delay: 0.6, ease: EASE_OUT }}
@@ -162,26 +177,37 @@ const Hero: React.FC<{ onSearch: () => void; onRelease: () => void }> = ({ onSea
             <ManifestSlip phase={phase} />
           </motion.div>
         </div>
+      </Container>
+    </section>
+  );
+};
 
-        <div className="relative mt-12 lg:mt-16 lg:w-[calc(100%-330px)]">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Pill tone="danger">Sold out</Pill>
-              <span className="code text-xs text-ink3">UPPER DECK · 2+1 SLEEPER</span>
-            </div>
-            <span className="text-xs text-ink3">Illustrative layout and passenger names</span>
+/* The coach seen from above: the next scroll after the landscape */
+const DeckSection: React.FC<{ phase: RelayPhase }> = ({ phase }) => {
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
+  const coachX = useTransform(scrollYProgress, [0, 1], ['-6%', '7%']);
+  return (
+    <section ref={ref} className="relative overflow-hidden pb-10 pt-12 sm:pt-16">
+      <Container>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Pill tone="danger">Sold out</Pill>
+            <span className="code text-xs text-ink3">UPPER DECK · 2+1 SLEEPER · KA-01-F-8899</span>
           </div>
-          <motion.div style={{ x: coachX }}>
-            <motion.div
-              initial={{ opacity: 0, x: -60 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 1.4, delay: 0.4, ease: EASE_OUT }}
-            >
-              <DeckPlan phase={phase} />
-            </motion.div>
-          </motion.div>
-          <Road />
+          <span className="text-xs text-ink3">Illustrative layout and passenger names</span>
         </div>
+        <motion.div style={{ x: coachX }}>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 1.1, ease: EASE_OUT }}
+          >
+            <DeckPlan phase={phase} />
+          </motion.div>
+        </motion.div>
+        <Road />
       </Container>
     </section>
   );
@@ -978,9 +1004,16 @@ const Close: React.FC<{ onRelease: () => void; onSearch: () => void }> = ({ onRe
 /* ============================================================================ */
 export const HomePage: React.FC<HomePageProps> = ({ onSearchClick, currentUser, onSelectRole, onOpenAwsModal }) => {
   const release = () => onSelectRole('seller', 'tickets');
+  // One relay loop drives both the manifest slip and the deck plan, so they stay in step.
+  const openingRef = useRef<HTMLDivElement>(null);
+  const openingInView = useInView(openingRef, { amount: 0.1 });
+  const phase = useRelayLoop(openingInView);
   return (
     <div>
-      <Hero onSearch={onSearchClick} onRelease={release} />
+      <div ref={openingRef}>
+        <Hero onSearch={onSearchClick} onRelease={release} phase={phase} />
+        <DeckSection phase={phase} />
+      </div>
       <People />
       <Relay />
       <Money />

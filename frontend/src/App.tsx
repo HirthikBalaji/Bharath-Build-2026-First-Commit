@@ -40,7 +40,7 @@ import { User, Bus, Ticket, ReissueRequestItem, ResaleTransaction, Notification,
 type Tab = 'home' | 'search' | 'tickets' | 'operator' | 'transactions';
 
 const TITLES: Record<Tab, string> = {
-  home: 'SeatRelay · Your seat travels on',
+  home: 'SeatRelay · Your seat finds its next rider',
   search: 'Find a seat · SeatRelay',
   tickets: 'My journeys · SeatRelay',
   operator: 'Dispatch · SeatRelay',

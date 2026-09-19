@@ -195,7 +195,10 @@ class ResaleWorkflowService {
       phone,
       govIdType,
       govIdNumber,
-      paymentMethod
+      paymentMethod,
+      digilockerVerified,
+      digilockerTxnId,
+      digilockerName
     } = params;
 
     const listing = DatabaseService.get(`
@@ -234,12 +237,14 @@ class ResaleWorkflowService {
                 id, transactionNumber, listingId, buyerId,
                 buyerPassengerName, buyerPassengerAge, buyerPassengerGender,
                 buyerPhone, buyerGovIdType, buyerGovIdNumber,
+                digilockerVerified, digilockerTxnId, digilockerName,
                 status, sellerRefundAmount, platformFee, createdAt
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REISSUE_PENDING', ?, ?, ?)`,
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REISSUE_PENDING', ?, ?, ?)`,
         params: [
           transactionId, transactionNumber, listingId, buyerId,
           passengerName, passengerAge, passengerGender,
           phone, govIdType, govIdNumber,
+          digilockerVerified ? 1 : 0, digilockerTxnId || null, digilockerName || null,
           sellerRefundAmount, listing.platformFee, nowIso
         ]
       },
@@ -354,13 +359,13 @@ class ResaleWorkflowService {
                 id, ticketNumber, userId, busId, seatId,
                 passengerName, passengerAge, passengerGender, passengerPhone,
                 govIdType, govIdNumber, fare, status, qrCode,
-                reissuedFromId, issuedAt, updatedAt
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?, ?, ?, ?)`,
+                reissuedFromId, digilockerVerified, digilockerTxnId, issuedAt, updatedAt
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?, ?, ?, ?, ?, ?)`,
         params: [
           newTicketId, newTicketNumber, tx.buyerId, tx.busId, tx.seatId,
           tx.buyerPassengerName, tx.buyerPassengerAge, tx.buyerPassengerGender, tx.buyerPhone,
           tx.buyerGovIdType, tx.buyerGovIdNumber, tx.resalePrice, qrCodeUrl,
-          tx.ticketId, nowIso, nowIso
+          tx.ticketId, tx.digilockerVerified ? 1 : 0, tx.digilockerTxnId || null, nowIso, nowIso
         ]
       },
       // 3. Record Refund

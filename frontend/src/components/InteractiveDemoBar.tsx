@@ -22,6 +22,7 @@ interface InteractiveDemoBarProps {
   setActiveTab: (tab: string) => void;
   onRunDemo: () => void;
   onResetDemo: () => void;
+  onOpenAwsModal?: () => void;
   isDemoRunning: boolean;
   tickets: TicketType[];
   reissues: ReissueRequestItem[];
@@ -35,6 +36,7 @@ export const InteractiveDemoBar: React.FC<InteractiveDemoBarProps> = ({
   setActiveTab,
   onRunDemo,
   onResetDemo,
+  onOpenAwsModal,
   isDemoRunning,
   tickets,
   reissues
@@ -105,6 +107,16 @@ export const InteractiveDemoBar: React.FC<InteractiveDemoBarProps> = ({
             <span>Jump to Step {currentPhase}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
+
+          {/* AWS Architecture Spec Quick Toggle */}
+          {onOpenAwsModal && (
+            <button
+              onClick={onOpenAwsModal}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg font-bold shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              <span>☁️ AWS Architecture</span>
+            </button>
+          )}
 
           {/* Automated Run */}
           <button

@@ -339,6 +339,18 @@ export const MyTickets: React.FC<MyTicketsProps> = ({
                 </div>
               </div>
 
+              {/* Specification Comparison Callout (Section 11) */}
+              <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5 text-xs text-amber-950 mb-4 space-y-1">
+                <div className="font-bold flex items-center justify-between">
+                  <span>Standard Operator Cancellation:</span>
+                  <span className="text-rose-600 font-black">₹0 back (100% loss)</span>
+                </div>
+                <div className="font-bold flex items-center justify-between text-emerald-800">
+                  <span>Release on SeatRelay Protocol:</span>
+                  <span className="text-emerald-700 font-black">₹{listingModalTicket.fare} back if it sells</span>
+                </div>
+              </div>
+
               {/* Explanation Quote from spec */}
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 text-xs text-emerald-900 mb-6 leading-relaxed">
                 <p className="font-bold mb-1">Important Protection Terms:</p>

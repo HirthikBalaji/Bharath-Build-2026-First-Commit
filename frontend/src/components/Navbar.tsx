@@ -17,6 +17,7 @@ interface NavbarProps {
   setActiveTab: (tab: string) => void;
   unreadCount: number;
   onOpenNotifications: () => void;
+  onOpenAwsModal: () => void;
   onRunCompleteDemo: () => void;
   isDemoRunning: boolean;
 }
@@ -29,6 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   unreadCount,
   onOpenNotifications,
+  onOpenAwsModal,
   onRunCompleteDemo,
   isDemoRunning
 }) => {
@@ -110,6 +112,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <BookOpen className="w-4 h-4" />
               <span>Ledger</span>
+            </button>
+            <button
+              onClick={onOpenAwsModal}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors flex items-center gap-1.5"
+            >
+              <span>☁️ AWS Architecture</span>
             </button>
           </nav>
 

@@ -24,6 +24,8 @@ def init_db():
         email TEXT UNIQUE NOT NULL,
         phone TEXT NOT NULL,
         role TEXT NOT NULL,
+        passwordHash TEXT,
+        salt TEXT,
         createdAt TEXT NOT NULL
     );
 

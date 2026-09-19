@@ -7,7 +7,44 @@ const {
   ResaleWorkflowService,
   maskGovId
 } = require('./workflow');
+const crypto = require('crypto');
 const { seedData } = require('./seed');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'seatrelay-jwt-prod-secret-982155';
+
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return { hash, salt };
+}
+
+function verifyPassword(password, hash, salt) {
+  if (!hash || !salt) return false;
+  const computed = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
+}
+
+function createToken(payload) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + 7 * 24 * 3600 * 1000 })).toString('base64url');
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  return `${header}.${body}.${signature}`;
+}
+
+function verifyToken(token) {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [header, body, signature] = parts;
+  const expected = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  if (signature !== expected) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf-8'));
+    if (payload.exp && payload.exp < Date.now()) return null;
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -492,11 +529,105 @@ app.get('/mock-operator/capabilities', (req, res) => {
 });
 
 // ==========================================
-// 8. USERS / NOTIFICATIONS / TRANSACTIONS / REFUNDS
+// 8. AUTHENTICATION & USERS
 // ==========================================
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const user = DatabaseService.get(`SELECT * FROM users WHERE LOWER(email) = LOWER(?)`, [email.trim()]);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // If user has no password yet (legacy), allow setup or verify against default
+    let isValid = false;
+    if (user.passwordHash && user.salt) {
+      isValid = verifyPassword(password, user.passwordHash, user.salt);
+    } else {
+      // Allow user default password based on email
+      const defaultPass = `${user.email.split('@')[0]}@123`;
+      if (password === defaultPass || password === 'password123') {
+        isValid = true;
+        // Auto-hash password
+        const creds = hashPassword(password);
+        DatabaseService.run(`UPDATE users SET passwordHash = ?, salt = ? WHERE id = ?`, [creds.hash, creds.salt, user.id]);
+      }
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const token = createToken({ userId: user.id, email: user.email, role: user.role });
+    const { passwordHash, salt, ...safeUser } = user;
+    res.json({ token, user: safeUser });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { name, email, phone, role, password } = req.body;
+    if (!name || !email || !phone || !password) {
+      return res.status(400).json({ error: 'All fields (name, email, phone, password) are required' });
+    }
+
+    const existing = DatabaseService.get(`SELECT id FROM users WHERE LOWER(email) = LOWER(?)`, [email.trim()]);
+    if (existing) {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+
+    const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const creds = hashPassword(password);
+    const assignedRole = role === 'operator' ? 'operator' : role === 'seller' ? 'seller' : 'buyer';
+    const now = new Date().toISOString();
+
+    DatabaseService.run(`
+      INSERT INTO users (id, name, email, phone, role, passwordHash, salt, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [userId, name.trim(), email.trim().toLowerCase(), phone.trim(), assignedRole, creds.hash, creds.salt, now]);
+
+    const newUser = DatabaseService.get(`SELECT id, name, email, phone, role, createdAt FROM users WHERE id = ?`, [userId]);
+    const token = createToken({ userId: newUser.id, email: newUser.email, role: newUser.role });
+
+    res.status(201).json({ token, user: newUser });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/auth/me', (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authorization header missing or invalid' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const payload = verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({ error: 'Session expired or token invalid' });
+    }
+
+    const user = DatabaseService.get(`SELECT id, name, email, phone, role, createdAt FROM users WHERE id = ?`, [payload.userId]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/users', (req, res) => {
   try {
-    const users = DatabaseService.query(`SELECT * FROM users ORDER BY createdAt ASC`);
+    const users = DatabaseService.query(`SELECT id, name, email, phone, role, createdAt FROM users ORDER BY createdAt ASC`);
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });

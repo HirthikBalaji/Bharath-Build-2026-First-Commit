@@ -15,13 +15,27 @@ async function seedData() {
   const operatorUserId = 'usr_swiftbus_ops_3';
   const now = new Date().toISOString();
 
+  // Secure password hashing with PBKDF2
+  function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+    const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+    return { hash, salt };
+  }
+
+  const rahulCreds = hashPassword('rahul@123');
+  const priyaCreds = hashPassword('priya@123');
+  const opsCreds = hashPassword('operator@123');
+
   DatabaseService.run(`
-    INSERT OR REPLACE INTO users (id, name, email, phone, role, createdAt)
+    INSERT OR REPLACE INTO users (id, name, email, phone, role, passwordHash, salt, createdAt)
     VALUES 
-      (?, 'Rahul Sharma', 'rahul@example.com', '+91 98450 12345', 'seller', ?),
-      (?, 'Priya Kumar', 'priya@example.com', '+91 98765 43210', 'buyer', ?),
-      (?, 'SwiftBus Operations', 'ops@swiftbus.in', '+91 80 2345 6789', 'operator', ?)
-  `, [rahulId, now, priyaId, now, operatorUserId, now]);
+      (?, 'Rahul Sharma', 'rahul@example.com', '+91 98450 12345', 'seller', ?, ?, ?),
+      (?, 'Priya Kumar', 'priya@example.com', '+91 98765 43210', 'buyer', ?, ?, ?),
+      (?, 'SwiftBus Operations', 'ops@swiftbus.in', '+91 80 2345 6789', 'operator', ?, ?, ?)
+  `, [
+    rahulId, rahulCreds.hash, rahulCreds.salt, now,
+    priyaId, priyaCreds.hash, priyaCreds.salt, now,
+    operatorUserId, opsCreds.hash, opsCreds.salt, now
+  ]);
 
   // 2. Operator
   const operatorId = 'op_swiftbus_1';

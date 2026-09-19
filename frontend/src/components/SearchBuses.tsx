@@ -310,8 +310,8 @@ const CoachRow: React.FC<{ bus: Bus; onSelect: (bus: Bus, seat: ResaleSeatSummar
         </div>
       </div>
 
-      {bus.isSoldOut &&
-        (hasResale ? (
+      {bus.isSoldOut ? (
+        hasResale ? (
           <div className="border-t border-marigold/40 bg-marigold/[0.09] px-5 py-4 sm:px-6">
             <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
               <span className="relative flex h-2 w-2">
@@ -327,7 +327,7 @@ const CoachRow: React.FC<{ bus: Bus; onSelect: (bus: Bus, seat: ResaleSeatSummar
                   onClick={() => onSelect(bus, seat)}
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
-                  className="group flex items-stretch overflow-hidden rounded-xl border border-marigold/50 bg-surface text-left shadow-lift transition-colors hover:border-marigold"
+                  className="group flex items-stretch overflow-hidden rounded-xl border border-marigold/50 bg-surface text-left shadow-lift transition-colors hover:border-marigold cursor-pointer"
                 >
                   <div className="flex flex-1 items-center gap-3 px-4 py-3">
                     <BerthGlyph className="h-6 w-11" state="relay" />
@@ -350,7 +350,13 @@ const CoachRow: React.FC<{ bus: Bus; onSelect: (bus: Bus, seat: ResaleSeatSummar
           </div>
         ) : (
           <p className="border-t border-line px-5 py-3 text-sm text-ink3 sm:px-6">Sold out. Nobody has released a berth on this coach yet.</p>
-        ))}
+        )
+      ) : (
+        <div className="flex items-center justify-between border-t border-line bg-surface2/40 px-5 py-3 text-sm text-ink2 sm:px-6">
+          <span>{bus.availableDirect} direct seats open from {bus.operator}. Direct booking supported through operator reservation desk.</span>
+          <span className="code text-xs text-ink3 font-medium">Standard Fare {inr(bus.baseFare)}</span>
+        </div>
+      )}
     </article>
   );
 };

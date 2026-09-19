@@ -49,17 +49,23 @@ async function seedData() {
   const bus1Id = 'bus_bangalore_chennai_1030pm';
   const bus2Id = 'bus_bangalore_chennai_0900pm';
   const bus3Id = 'bus_bangalore_chennai_1115pm';
+  const bus4Id = 'bus_mumbai_pune_0800pm';
+  const bus5Id = 'bus_delhi_jaipur_0930pm';
 
   DatabaseService.run(`
     INSERT OR REPLACE INTO buses (id, operatorId, busNumber, busType, routeFrom, routeTo, departureTime, arrivalTime, travelDate, baseFare, createdAt)
     VALUES 
       (?, ?, 'KA-01-F-8899', 'AC Sleeper (2+1) Multi-Axle', 'Bangalore', 'Chennai', '2026-09-19T22:30:00.000Z', '2026-09-20T06:30:00.000Z', '2026-09-19', 850.0, ?),
       (?, ?, 'KA-01-F-9911', 'Volvo AC Semi-Sleeper (2+2)', 'Bangalore', 'Chennai', '2026-09-19T21:00:00.000Z', '2026-09-20T05:00:00.000Z', '2026-09-19', 750.0, ?),
-      (?, ?, 'KA-01-F-3344', 'Scania High-Deck AC Sleeper', 'Bangalore', 'Chennai', '2026-09-19T23:15:00.000Z', '2026-09-20T07:00:00.000Z', '2026-09-19', 950.0, ?)
+      (?, ?, 'KA-01-F-3344', 'Scania High-Deck AC Sleeper', 'Bangalore', 'Chennai', '2026-09-19T23:15:00.000Z', '2026-09-20T07:00:00.000Z', '2026-09-19', 950.0, ?),
+      (?, ?, 'MH-12-Q-4521', 'Mercedes Multi-Axle Sleeper', 'Mumbai', 'Pune', '2026-09-19T20:00:00.000Z', '2026-09-19T23:30:00.000Z', '2026-09-19', 550.0, ?),
+      (?, ?, 'DL-01-A-7788', 'Volvo B11R Luxury Coach', 'Delhi', 'Jaipur', '2026-09-19T21:30:00.000Z', '2026-09-20T03:30:00.000Z', '2026-09-19', 650.0, ?)
   `, [
     bus1Id, operatorId, now,
     bus2Id, operatorId, now,
-    bus3Id, operatorId, now
+    bus3Id, operatorId, now,
+    bus4Id, operatorId, now,
+    bus5Id, operatorId, now
   ]);
 
   // 4. Seats for Bus 1
@@ -95,12 +101,14 @@ async function seedData() {
     }
   }
 
-  // Seats for Bus 2 & Bus 3 (few available seats)
-  for (let i = 1; i <= 6; i++) {
-    DatabaseService.run(`
-      INSERT OR REPLACE INTO seats (id, busId, seatNumber, seatType, status)
-      VALUES (?, ?, ?, 'SEATER', ?)
-    `, [`seat_b2_S${i}`, bus2Id, `S${i}`, i <= 4 ? 'BOOKED' : 'AVAILABLE']);
+  // Seats for Bus 2, 3, 4, 5
+  for (const bId of [bus2Id, bus3Id, bus4Id, bus5Id]) {
+    for (let i = 1; i <= 6; i++) {
+      DatabaseService.run(`
+        INSERT OR REPLACE INTO seats (id, busId, seatNumber, seatType, status)
+        VALUES (?, ?, ?, 'SEATER', ?)
+      `, [`seat_${bId}_S${i}`, bId, `S${i}`, i <= 3 ? 'BOOKED' : 'AVAILABLE']);
+    }
   }
 
   // 5. Generate verified QR code for Rahul's original ticket

@@ -260,21 +260,6 @@ export function App() {
         isDemoRunning={isDemoRunning}
       />
 
-      {/* Interactive Hackathon Demo Bar with Live Status & Controls */}
-      <InteractiveDemoBar
-        currentUser={currentUser}
-        users={users}
-        onSelectUser={(u) => setCurrentUser(u)}
-        activeTab={activeTab}
-        setActiveTab={(t) => setActiveTab(t as any)}
-        onRunDemo={handleRunCompleteDemo}
-        onResetDemo={handleResetDemo}
-        onOpenAwsModal={() => setAwsModalOpen(true)}
-        isDemoRunning={isDemoRunning}
-        tickets={tickets}
-        reissues={reissues}
-      />
-
       <main className="flex-1">
         {activeTab === 'home' && (
           <HomePage

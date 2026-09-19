@@ -67,13 +67,13 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
-              Mock Operator GDS Dispatch Terminal
+            <span className="text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200">
+              Operator GDS Dispatch Terminal
             </span>
-            <span className="text-xs text-slate-400 font-mono">SWIFT-CARRIER-API-v2</span>
+            <span className="text-xs text-slate-400 font-mono">SWIFT-CARRIER-API</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
-            SwiftBus Express — Operator Portal
+            SwiftBus Express — Operations Portal
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Authorized passenger reissuance, seat reassignment, and passenger manifest sync

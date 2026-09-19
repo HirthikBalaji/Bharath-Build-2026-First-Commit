@@ -91,7 +91,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </button>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              Protocol Resale Checkout
+              Verified Seat Resale
             </span>
             <span className="text-xs font-mono text-slate-400">Escrow Protected</span>
           </div>
@@ -260,7 +260,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {/* Payment Method Selector */}
           <div>
             <label className="block text-[11px] font-bold text-slate-600 mb-2">
-              Select Mock Payment Gateway
+              Select Payment Method
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button

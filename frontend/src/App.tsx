@@ -10,6 +10,7 @@ import { CheckoutModal } from './components/CheckoutModal';
 import { DigitalTicketModal } from './components/DigitalTicketModal';
 import { DemoProgressModal } from './components/DemoProgressModal';
 import { TransactionLedger } from './components/TransactionLedger';
+import { AwsArchitectureModal } from './components/AwsArchitectureModal';
 import { User, Bus, Ticket, ReissueRequestItem, ResaleTransaction, Notification, ResaleSeatSummary } from './types';
 
 export function App() {
@@ -38,6 +39,7 @@ export function App() {
   // Demo Runner State
   const [isDemoRunning, setIsDemoRunning] = useState(false);
   const [demoModalOpen, setDemoModalOpen] = useState(false);
+  const [awsModalOpen, setAwsModalOpen] = useState(false);
   const [demoSteps, setDemoSteps] = useState<Array<{ step: number; title: string; detail: string; timestamp: string }>>([]);
   const [demoNewTicket, setDemoNewTicket] = useState<Ticket | null>(null);
 
@@ -237,6 +239,7 @@ export function App() {
             alert(notifications.map((n) => `• [${n.type}] ${n.title}\n${n.message}`).join('\n\n'));
           }
         }}
+        onOpenAwsModal={() => setAwsModalOpen(true)}
         onRunCompleteDemo={handleRunCompleteDemo}
         isDemoRunning={isDemoRunning}
       />
@@ -250,6 +253,7 @@ export function App() {
         setActiveTab={(t) => setActiveTab(t as any)}
         onRunDemo={handleRunCompleteDemo}
         onResetDemo={handleResetDemo}
+        onOpenAwsModal={() => setAwsModalOpen(true)}
         isDemoRunning={isDemoRunning}
         tickets={tickets}
         reissues={reissues}
@@ -264,6 +268,11 @@ export function App() {
             onRunDemo={handleRunCompleteDemo}
             isDemoRunning={isDemoRunning}
             currentUser={currentUser}
+            onSelectRole={(role, tab) => {
+              const u = users.find((user) => user.role === role);
+              if (u) setCurrentUser(u);
+              setActiveTab(tab as any);
+            }}
           />
         )}
 
@@ -340,6 +349,12 @@ export function App() {
           setDemoModalOpen(false);
           setSelectedTicketForQR(t);
         }}
+      />
+
+      {/* AWS Architecture & Step Functions Modal (Hackathon Judges Spec) */}
+      <AwsArchitectureModal
+        isOpen={awsModalOpen}
+        onClose={() => setAwsModalOpen(false)}
       />
 
       {/* Footer */}

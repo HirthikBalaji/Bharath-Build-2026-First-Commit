@@ -7,6 +7,7 @@ import {
   Building2, 
   BookOpen
 } from 'lucide-react';
+import { Logo } from './Logo';
 import { User } from '../types';
 
 interface NavbarProps {
@@ -18,6 +19,8 @@ interface NavbarProps {
   unreadCount: number;
   onOpenNotifications: () => void;
   onOpenAwsModal: () => void;
+  onOpenAuth: (mode?: 'login' | 'register') => void;
+  onLogout: () => void;
   onRunCompleteDemo: () => void;
   isDemoRunning: boolean;
 }
@@ -31,6 +34,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   unreadCount,
   onOpenNotifications,
   onOpenAwsModal,
+  onOpenAuth,
+  onLogout,
   onRunCompleteDemo,
   isDemoRunning
 }) => {
@@ -40,7 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-16">
           {/* Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('home')}>
-            <img src="/logo.svg" alt="SeatRelay" className="h-10 w-10 rounded-xl shadow-md shadow-emerald-600/20 object-contain" />
+            <Logo size={40} />
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold tracking-tight text-slate-900">Seat<span className="text-emerald-600">Relay</span></span>
@@ -127,26 +132,39 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
 
-            {/* Role switcher dropdown */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase px-2 hidden sm:inline">
-                Role:
-              </span>
-              <select
-                value={currentUser?.id || ''}
-                onChange={(e) => {
-                  const u = users.find((user) => user.id === e.target.value);
-                  if (u) onSelectUser(u);
-                }}
-                className="bg-white text-xs font-semibold text-slate-800 py-1 px-2.5 rounded-lg border-0 shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer"
-              >
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} ({u.role.toUpperCase()})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* User Session Profile & Auth */}
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 bg-slate-100 pl-3 pr-1 py-1 rounded-xl border border-slate-200">
+                  <div className="text-left hidden sm:block">
+                    <span className="text-xs font-bold text-slate-900 block leading-tight">{currentUser.name}</span>
+                    <span className="text-[10px] text-slate-500 uppercase font-mono">{currentUser.role}</span>
+                  </div>
+                  <button
+                    onClick={onLogout}
+                    title="Sign Out"
+                    className="px-2.5 py-1 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-lg text-xs font-bold border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onOpenAuth('login')}
+                  className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 shadow-sm transition-colors cursor-pointer"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => onOpenAuth('register')}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
+                >
+                  Register
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

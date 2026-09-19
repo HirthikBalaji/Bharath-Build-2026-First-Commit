@@ -11,6 +11,8 @@ import { DigitalTicketModal } from './components/DigitalTicketModal';
 import { DemoProgressModal } from './components/DemoProgressModal';
 import { TransactionLedger } from './components/TransactionLedger';
 import { AwsArchitectureModal } from './components/AwsArchitectureModal';
+import { AuthModal } from './components/AuthModal';
+import { Logo } from './components/Logo';
 import { User, Bus, Ticket, ReissueRequestItem, ResaleTransaction, Notification, ResaleSeatSummary } from './types';
 
 export function App() {
@@ -35,6 +37,8 @@ export function App() {
   // Modals
   const [selectedSeatForCheckout, setSelectedSeatForCheckout] = useState<{ bus: Bus; seat: ResaleSeatSummary } | null>(null);
   const [selectedTicketForQR, setSelectedTicketForQR] = useState<Ticket | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
   // Demo Runner State
   const [isDemoRunning, setIsDemoRunning] = useState(false);
@@ -43,13 +47,45 @@ export function App() {
   const [demoSteps, setDemoSteps] = useState<Array<{ step: number; title: string; detail: string; timestamp: string }>>([]);
   const [demoNewTicket, setDemoNewTicket] = useState<Ticket | null>(null);
 
-  // Initial Fetch
+  // Initial Fetch & Persistent Session Check
   useEffect(() => {
+    checkSavedSession();
     fetchUsers();
     fetchBuses();
     fetchReissues();
     fetchTransactions();
   }, []);
+
+  const checkSavedSession = async () => {
+    const token = localStorage.getItem('seatrelay_token');
+    const savedUser = localStorage.getItem('seatrelay_user');
+    if (token) {
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const user = await res.json();
+          setCurrentUser(user);
+          return;
+        }
+      } catch (e) {
+        console.error('Session check failed', e);
+      }
+    }
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch (e) {}
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('seatrelay_token');
+    localStorage.removeItem('seatrelay_user');
+    setCurrentUser(null);
+    setActiveTab('home');
+  };
 
   // When currentUser changes, fetch their tickets and notifications
   useEffect(() => {
@@ -256,6 +292,11 @@ export function App() {
           }
         }}
         onOpenAwsModal={() => setAwsModalOpen(true)}
+        onOpenAuth={(mode = 'login') => {
+          setAuthModalMode(mode);
+          setAuthModalOpen(true);
+        }}
+        onLogout={handleLogout}
         onRunCompleteDemo={handleRunCompleteDemo}
         isDemoRunning={isDemoRunning}
       />
@@ -358,12 +399,26 @@ export function App() {
         onClose={() => setAwsModalOpen(false)}
       />
 
+      {/* Production Real Authentication Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        initialMode={authModalMode}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={(user) => {
+          setCurrentUser(user);
+          fetchUsers();
+          if (user.role === 'seller') setActiveTab('tickets');
+          else if (user.role === 'operator') setActiveTab('operator');
+          else setActiveTab('search');
+        }}
+      />
+
       {/* Footer */}
       <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-10 text-xs">
         <div className="max-w-7xl mx-auto px-4 space-y-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-6">
             <div className="flex items-center gap-3">
-              <img src="/logo.svg" alt="SeatRelay" className="h-8 w-8 rounded-lg" />
+              <Logo size={34} />
               <div>
                 <span className="text-base font-black text-white">Seat<span className="text-emerald-500">Relay</span></span>
                 <p className="text-[11px] text-slate-400">Authorized Passenger Reissuance & Resale Platform</p>

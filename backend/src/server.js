@@ -1,0 +1,707 @@
+const express = require('express');
+const cors = require('cors');
+const { DatabaseService } = require('./db');
+const {
+  MockOperatorService,
+  MockPaymentService,
+  ResaleWorkflowService,
+  maskGovId
+} = require('./workflow');
+const { seedData } = require('./seed');
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+app.use(cors());
+app.use(express.json());
+
+// Request logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'SeatRelay API', time: new Date() });
+});
+
+// ==========================================
+// 1. BUS SEARCH API
+// ==========================================
+app.get('/api/buses/search', (req, res) => {
+  try {
+    const { from, to, date } = req.query;
+
+    let sql = `
+      SELECT b.*, o.name as operatorName, o.code as operatorCode,
+             o.minimumResaleWindowMinutes, o.supportsResale
+      FROM buses b
+      JOIN operators o ON b.operatorId = o.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (from) {
+      sql += ` AND LOWER(b.routeFrom) LIKE LOWER(?)`;
+      params.push(`%${from}%`);
+    }
+    if (to) {
+      sql += ` AND LOWER(b.routeTo) LIKE LOWER(?)`;
+      params.push(`%${to}%`);
+    }
+    if (date) {
+      sql += ` AND b.travelDate = ?`;
+      params.push(date);
+    }
+
+    const buses = DatabaseService.query(sql, params);
+
+    const result = buses.map((bus) => {
+      // Fetch seats and ticket statuses for each bus
+      const seats = DatabaseService.query(`SELECT * FROM seats WHERE busId = ?`, [bus.id]);
+      const totalSeats = seats.length;
+
+      // Check resale listings active on this bus
+      const resaleListings = DatabaseService.query(`
+        SELECT rl.id as listingId, rl.listingNumber, rl.originalPrice as originalFare,
+               rl.resalePrice, rl.platformFee, (rl.resalePrice + rl.platformFee) as totalPrice,
+               t.id as ticketId, t.ticketNumber, s.seatNumber, s.seatType
+        FROM resale_listings rl
+        JOIN tickets t ON rl.ticketId = t.id
+        JOIN seats s ON t.seatId = s.id
+        WHERE t.busId = ? AND rl.status = 'LISTED'
+      `, [bus.id]);
+
+      // Direct available seats (not booked or held)
+      const availableSeats = seats.filter((s) => s.status === 'AVAILABLE');
+      const availableDirect = availableSeats.length;
+
+      return {
+        id: bus.id,
+        operator: bus.operatorName,
+        operatorCode: bus.operatorCode,
+        busNumber: bus.busNumber,
+        busType: bus.busType,
+        routeFrom: bus.routeFrom,
+        routeTo: bus.routeTo,
+        departureTime: bus.departureTime,
+        arrivalTime: bus.arrivalTime,
+        travelDate: bus.travelDate,
+        baseFare: bus.baseFare,
+        totalSeats,
+        availableDirect,
+        isSoldOut: availableDirect === 0,
+        resaleAvailableCount: resaleListings.length,
+        resaleSeats: resaleListings
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 2. MY TICKETS (SELLER / BUYER)
+// ==========================================
+app.get('/api/tickets/my', (req, res) => {
+  try {
+    const userId = req.query.userId || req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const tickets = DatabaseService.query(`
+      SELECT t.*, b.routeFrom, b.routeTo, b.departureTime, b.arrivalTime,
+             b.travelDate, b.busNumber, b.busType, o.name as operatorName,
+             s.seatNumber, s.seatType
+      FROM tickets t
+      JOIN buses b ON t.busId = b.id
+      JOIN operators o ON b.operatorId = o.id
+      JOIN seats s ON t.seatId = s.id
+      WHERE t.userId = ?
+      ORDER BY t.issuedAt DESC
+    `, [userId]);
+
+    const formatted = tickets.map((t) => {
+      // Find active resale listing if exists
+      const listing = DatabaseService.get(`
+        SELECT * FROM resale_listings
+        WHERE ticketId = ? AND status IN ('LISTED', 'PURCHASED', 'COMPLETED')
+        ORDER BY createdAt DESC LIMIT 1
+      `, [t.id]);
+
+      let transactions = [];
+      if (listing) {
+        transactions = DatabaseService.query(`
+          SELECT tx.*, r.referenceId as refundReferenceId, r.status as refundStatus
+          FROM resale_transactions tx
+          LEFT JOIN refunds r ON tx.id = r.transactionId
+          WHERE tx.listingId = ?
+        `, [listing.id]);
+      }
+
+      return {
+        id: t.id,
+        ticketNumber: t.ticketNumber,
+        passengerName: t.passengerName,
+        passengerAge: t.passengerAge,
+        passengerGender: t.passengerGender,
+        fare: t.fare,
+        status: t.status,
+        qrCode: t.qrCode,
+        issuedAt: t.issuedAt,
+        routeFrom: t.routeFrom,
+        routeTo: t.routeTo,
+        departureTime: t.departureTime,
+        arrivalTime: t.arrivalTime,
+        travelDate: t.travelDate,
+        busNumber: t.busNumber,
+        busType: t.busType,
+        operatorName: t.operatorName,
+        seatNumber: t.seatNumber,
+        seatType: t.seatType,
+        activeListing: listing
+          ? {
+              id: listing.id,
+              listingNumber: listing.listingNumber,
+              status: listing.status,
+              originalPrice: listing.originalPrice,
+              resalePrice: listing.resalePrice,
+              platformFee: listing.platformFee,
+              expectedRefund: listing.resalePrice - listing.platformFee,
+              createdAt: listing.createdAt,
+              transactions
+            }
+          : null
+      };
+    });
+
+    res.json(formatted);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/tickets/:id
+app.get('/api/tickets/:id', (req, res) => {
+  try {
+    const ticket = DatabaseService.get(`
+      SELECT t.*, b.routeFrom, b.routeTo, b.departureTime, b.arrivalTime,
+             b.travelDate, b.busNumber, b.busType, o.name as operatorName,
+             s.seatNumber, s.seatType
+      FROM tickets t
+      JOIN buses b ON t.busId = b.id
+      JOIN operators o ON b.operatorId = o.id
+      JOIN seats s ON t.seatId = s.id
+      WHERE t.id = ?
+    `, [req.params.id]);
+
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    ticket.govIdNumber = maskGovId(ticket.govIdNumber);
+    res.json(ticket);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 3. SELLER RESALE LISTING
+// ==========================================
+app.post('/api/tickets/:id/list', async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const { sellerId } = req.body;
+
+    if (!sellerId) return res.status(400).json({ error: 'sellerId is required' });
+
+    const result = await ResaleWorkflowService.listTicketForResale(ticketId, sellerId);
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// DELETE /api/resale/:id (Cancel resale listing)
+app.delete('/api/resale/:id', async (req, res) => {
+  try {
+    const listingId = req.params.id;
+    const { sellerId } = req.body;
+
+    if (!sellerId) return res.status(400).json({ error: 'sellerId is required' });
+
+    const result = await ResaleWorkflowService.cancelListing(listingId, sellerId);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 4. RESALE MARKETPLACE & DETAILS
+// ==========================================
+app.get('/api/resale/search', (req, res) => {
+  try {
+    const listings = DatabaseService.query(`
+      SELECT l.*, s.seatNumber, s.seatType, b.busNumber, b.busType,
+             o.name as operatorName, b.routeFrom, b.routeTo, b.travelDate,
+             b.departureTime, (l.resalePrice + l.platformFee) as totalPrice
+      FROM resale_listings l
+      JOIN tickets t ON l.ticketId = t.id
+      JOIN seats s ON t.seatId = s.id
+      JOIN buses b ON t.busId = b.id
+      JOIN operators o ON b.operatorId = o.id
+      WHERE l.status = 'LISTED'
+      ORDER BY l.createdAt DESC
+    `);
+    res.json(listings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/resale/:id
+app.get('/api/resale/:id', (req, res) => {
+  try {
+    const listing = DatabaseService.get(`
+      SELECT l.*, s.seatNumber, s.seatType, b.id as busId, b.busNumber, b.busType,
+             o.name as operatorName, b.routeFrom, b.routeTo, b.travelDate,
+             b.departureTime, (l.resalePrice + l.platformFee) as totalPrice
+      FROM resale_listings l
+      JOIN tickets t ON l.ticketId = t.id
+      JOIN seats s ON t.seatId = s.id
+      JOIN buses b ON t.busId = b.id
+      JOIN operators o ON b.operatorId = o.id
+      WHERE l.id = ?
+    `, [req.params.id]);
+
+    if (!listing) return res.status(404).json({ error: 'Listing not found' });
+
+    // Sanitize: do not expose seller identity to buyer
+    res.json({
+      id: listing.id,
+      listingNumber: listing.listingNumber,
+      status: listing.status,
+      originalPrice: listing.originalPrice,
+      resalePrice: listing.resalePrice,
+      platformFee: listing.platformFee,
+      totalPrice: listing.totalPrice,
+      seat: {
+        seatNumber: listing.seatNumber,
+        seatType: listing.seatType
+      },
+      bus: {
+        id: listing.busId,
+        operatorName: listing.operatorName,
+        busNumber: listing.busNumber,
+        busType: listing.busType,
+        routeFrom: listing.routeFrom,
+        routeTo: listing.routeTo,
+        departureTime: listing.departureTime,
+        travelDate: listing.travelDate
+      },
+      createdAt: listing.createdAt
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 5. BUYER CHECKOUT & PURCHASE
+// ==========================================
+app.post(['/api/resale/:id/purchase', '/resale/:id/purchase'], async (req, res) => {
+  try {
+    const listingId = req.params.id;
+    const {
+      buyerId,
+      passengerName,
+      passengerAge,
+      passengerGender,
+      phone,
+      govIdType,
+      govIdNumber,
+      paymentMethod
+    } = req.body;
+
+    if (!buyerId || !passengerName || !passengerAge || !passengerGender || !phone || !govIdType || !govIdNumber) {
+      return res.status(400).json({ error: 'All passenger and identity fields are required' });
+    }
+
+    const result = await ResaleWorkflowService.purchaseResaleListing({
+      listingId,
+      buyerId,
+      passengerName,
+      passengerAge: Number(passengerAge),
+      passengerGender,
+      phone,
+      govIdType,
+      govIdNumber,
+      paymentMethod
+    });
+
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// POST /api/payments/mock
+app.post('/api/payments/mock', async (req, res) => {
+  try {
+    const { amount, paymentMethod } = req.body;
+    const payment = await MockPaymentService.processPayment(amount, paymentMethod);
+    res.json(payment);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 6. OPERATOR DASHBOARD & REISSUE APPROVAL
+// ==========================================
+app.get('/api/operator/reissues', (req, res) => {
+  try {
+    const reissues = DatabaseService.query(`
+      SELECT tx.*, l.originalPrice as fare, l.resalePrice,
+             t.ticketNumber as origTicketNumber, t.passengerName as origPaxName, t.fare as origFare, t.status as origTicketStatus,
+             s.seatNumber, s.seatType,
+             b.id as busId, b.busNumber, b.routeFrom, b.routeTo, b.travelDate, b.departureTime,
+             o.name as operatorName,
+             uSeller.email as sellerEmail, uBuyer.email as buyerEmail,
+             newT.ticketNumber as newTicketNumber, newT.status as newTicketStatus, newT.qrCode as newTicketQr,
+             ref.id as refundId, ref.status as refundStatus, ref.referenceId as refundRef
+      FROM resale_transactions tx
+      JOIN resale_listings l ON tx.listingId = l.id
+      JOIN tickets t ON l.ticketId = t.id
+      JOIN seats s ON t.seatId = s.id
+      JOIN buses b ON t.busId = b.id
+      JOIN operators o ON b.operatorId = o.id
+      JOIN users uSeller ON l.sellerId = uSeller.id
+      JOIN users uBuyer ON tx.buyerId = uBuyer.id
+      LEFT JOIN tickets newT ON tx.newTicketId = newT.id
+      LEFT JOIN refunds ref ON tx.id = ref.transactionId
+      ORDER BY tx.createdAt DESC
+    `);
+
+    const formatted = reissues.map((r) => ({
+      transactionId: r.id,
+      transactionNumber: r.transactionNumber,
+      status: r.status,
+      createdAt: r.createdAt,
+      completedAt: r.completedAt,
+      fare: r.fare,
+      resalePrice: r.resalePrice,
+      platformFee: r.platformFee,
+      sellerRefundAmount: r.sellerRefundAmount,
+      bus: {
+        id: r.busId,
+        operatorName: r.operatorName,
+        busNumber: r.busNumber,
+        routeFrom: r.routeFrom,
+        routeTo: r.routeTo,
+        travelDate: r.travelDate,
+        departureTime: r.departureTime
+      },
+      seat: {
+        seatNumber: r.seatNumber,
+        seatType: r.seatType
+      },
+      originalPassenger: {
+        name: r.origPaxName,
+        ticketNumber: r.origTicketNumber,
+        fare: r.origFare,
+        sellerEmail: r.sellerEmail,
+        status: r.origTicketStatus
+      },
+      newPassenger: {
+        name: r.buyerPassengerName,
+        age: r.buyerPassengerAge,
+        gender: r.buyerPassengerGender,
+        phone: r.buyerPhone,
+        govIdType: r.buyerGovIdType,
+        govIdNumber: maskGovId(r.buyerGovIdNumber),
+        buyerEmail: r.buyerEmail
+      },
+      newTicket: r.newTicketNumber
+        ? {
+            id: r.newTicketId,
+            ticketNumber: r.newTicketNumber,
+            status: r.newTicketStatus,
+            qrCode: r.newTicketQr
+          }
+        : null,
+      refunds: r.refundId
+        ? [{ id: r.refundId, status: r.refundStatus, referenceId: r.refundRef, amount: r.sellerRefundAmount }]
+        : []
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/operator/reissues/:id/approve', async (req, res) => {
+  try {
+    const transactionId = req.params.id;
+    const { operatorUserId } = req.body;
+
+    const result = await ResaleWorkflowService.approveReissue(transactionId, operatorUserId || 'operator');
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/operator/reissues/:id/reject', async (req, res) => {
+  try {
+    const transactionId = req.params.id;
+    const { reason } = req.body;
+
+    const result = await ResaleWorkflowService.rejectReissue(transactionId, reason);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 7. SIMULATED OPERATOR REISSUE SERVICE (Section 13)
+// ==========================================
+app.post('/mock-operator/reissue', async (req, res) => {
+  try {
+    const { original_ticket_id, new_passenger } = req.body;
+    if (!original_ticket_id || !new_passenger) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+
+    const response = await MockOperatorService.requestReissue('SWIFT', original_ticket_id, new_passenger);
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/mock-operator/capabilities', (req, res) => {
+  const caps = MockOperatorService.getOperatorCapabilities('SWIFT');
+  res.json(caps);
+});
+
+// ==========================================
+// 8. USERS / NOTIFICATIONS / TRANSACTIONS / REFUNDS
+// ==========================================
+app.get('/api/users', (req, res) => {
+  try {
+    const users = DatabaseService.query(`SELECT * FROM users ORDER BY createdAt ASC`);
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/notifications/:userId', (req, res) => {
+  try {
+    const notifs = DatabaseService.query(`
+      SELECT * FROM notifications WHERE userId = ? ORDER BY createdAt DESC LIMIT 20
+    `, [req.params.userId]);
+    res.json(notifs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/refunds/:id', (req, res) => {
+  try {
+    const refund = DatabaseService.get(`SELECT * FROM refunds WHERE id = ?`, [req.params.id]);
+    if (!refund) return res.status(404).json({ error: 'Refund not found' });
+    res.json(refund);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/transactions', (req, res) => {
+  try {
+    const txs = DatabaseService.query(`
+      SELECT tx.*, l.originalPrice as fare, l.resalePrice,
+             t.ticketNumber as originalTicketNumber, s.seatNumber,
+             b.routeFrom, b.routeTo, b.travelDate, o.name as operatorName,
+             r.referenceId as refundReferenceId, r.status as refundStatus
+      FROM resale_transactions tx
+      JOIN resale_listings l ON tx.listingId = l.id
+      JOIN tickets t ON l.ticketId = t.id
+      JOIN seats s ON t.seatId = s.id
+      JOIN buses b ON t.busId = b.id
+      JOIN operators o ON b.operatorId = o.id
+      LEFT JOIN refunds r ON tx.id = r.transactionId
+      ORDER BY tx.createdAt DESC
+    `);
+    res.json(txs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// 9. AUTOMATED COMPLETE DEMO RUNNER (Section 17)
+// ==========================================
+app.post('/demo/run-full-flow', async (req, res) => {
+  try {
+    const rahul = DatabaseService.get(`SELECT * FROM users WHERE email = 'rahul@example.com'`);
+    const priya = DatabaseService.get(`SELECT * FROM users WHERE email = 'priya@example.com'`);
+    const operator = DatabaseService.get(`SELECT * FROM users WHERE role = 'operator'`);
+
+    if (!rahul || !priya) {
+      return res.status(400).json({ error: 'Demo users not found. Run seed.' });
+    }
+
+    let ticket = DatabaseService.get(`SELECT * FROM tickets WHERE ticketNumber = 'SB-92831'`);
+    if (!ticket) {
+      return res.status(400).json({ error: 'Rahul demo ticket SB-92831 not found' });
+    }
+
+    // Reset ticket to confirmed if needed
+    if (ticket.status !== 'CONFIRMED' && ticket.status !== 'LISTED_FOR_RESALE') {
+      DatabaseService.run(`UPDATE tickets SET status = 'CONFIRMED' WHERE id = ?`, [ticket.id]);
+    }
+
+    const stepsLog = [];
+
+    // 1. Seller lists U12
+    let listing = DatabaseService.get(`SELECT * FROM resale_listings WHERE ticketId = ? AND status = 'LISTED'`, [ticket.id]);
+    if (!listing) {
+      const listRes = await ResaleWorkflowService.listTicketForResale(ticket.id, rahul.id);
+      listing = listRes.listing;
+    }
+
+    stepsLog.push({
+      step: 1,
+      title: 'Seller Lists U12',
+      detail: `Rahul Sharma listed Ticket SB-92831 (Seat U12) for ₹850 face-value`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 2. Seat appears in resale marketplace
+    stepsLog.push({
+      step: 2,
+      title: 'Seat Appears in Resale Marketplace',
+      detail: `Bus marked SOLD OUT, with badge '♻️ 1 seat available through SeatRelay'`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 3. Buyer purchases U12
+    const purchaseRes = await ResaleWorkflowService.purchaseResaleListing({
+      listingId: listing.id,
+      buyerId: priya.id,
+      passengerName: 'Priya Kumar',
+      passengerAge: 24,
+      passengerGender: 'Female',
+      phone: '+91 98765 43210',
+      govIdType: 'Aadhaar Card',
+      govIdNumber: '9876 5432 4821',
+      paymentMethod: 'UPI'
+    });
+
+    stepsLog.push({
+      step: 3,
+      title: 'Buyer Purchases U12',
+      detail: `Priya Kumar confirmed purchase at original ticket fare ₹850`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 4. Payment succeeds
+    stepsLog.push({
+      step: 4,
+      title: 'Payment Confirmed',
+      detail: `Mock payment reference ${purchaseRes.paymentResult.referenceId} generated`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 5. Operator receives reissue request
+    stepsLog.push({
+      step: 5,
+      title: 'Operator Receives Reissue Request',
+      detail: `Pending request #${purchaseRes.transaction.transactionNumber} queued on operator dashboard`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 6. Operator approves reissue
+    const approveRes = await ResaleWorkflowService.approveReissue(purchaseRes.transaction.id, operator ? operator.id : 'op');
+
+    stepsLog.push({
+      step: 6,
+      title: 'Operator Approves Reissue',
+      detail: `Operator authorized passenger reissue to Priya Kumar (Auth: ${approveRes.operatorAuth})`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 7. New ticket generated
+    stepsLog.push({
+      step: 7,
+      title: 'New Digital Ticket Generated',
+      detail: `Digital Ticket ${approveRes.newTicket.ticketNumber} generated with verified QR code`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 8. Original ticket invalidated
+    stepsLog.push({
+      step: 8,
+      title: 'Original Ticket Invalidated',
+      detail: `Rahul's ticket SB-92831 marked INVALIDATED in system & operator manifest`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 9. Seller refund initiated
+    stepsLog.push({
+      step: 9,
+      title: 'Seller Refund Initiated & Completed',
+      detail: `₹850 refunded to Rahul Sharma (Ref: ${approveRes.refund.referenceId})`,
+      timestamp: new Date().toISOString()
+    });
+
+    // 10. Completed
+    stepsLog.push({
+      step: 10,
+      title: 'Transaction Completed',
+      detail: `Entire lifecycle completed at strict face-value. Zero scalping. Fully reconciled.`,
+      timestamp: new Date().toISOString()
+    });
+
+    res.json({
+      success: true,
+      newTicket: approveRes.newTicket,
+      steps: stepsLog
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /demo/reset
+app.post('/demo/reset', async (req, res) => {
+  try {
+    DatabaseService.run(`DELETE FROM refunds`);
+    DatabaseService.run(`DELETE FROM payments`);
+    DatabaseService.run(`DELETE FROM resale_transactions`);
+    DatabaseService.run(`DELETE FROM resale_listings`);
+    DatabaseService.run(`DELETE FROM notifications`);
+    DatabaseService.run(`DELETE FROM tickets`);
+    DatabaseService.run(`DELETE FROM seats`);
+    DatabaseService.run(`DELETE FROM buses`);
+    DatabaseService.run(`DELETE FROM operators`);
+    DatabaseService.run(`DELETE FROM users`);
+
+    await seedData();
+    res.json({ success: true, message: 'Database reset to initial demo state' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 SeatRelay Backend Server running on http://localhost:${PORT}`);
+});

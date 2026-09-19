@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { Navbar } from './components/Navbar';
+import { InteractiveDemoBar } from './components/InteractiveDemoBar';
 import { HomePage } from './components/HomePage';
 import { SearchBuses } from './components/SearchBuses';
 import { MyTickets } from './components/MyTickets';
@@ -238,6 +239,20 @@ export function App() {
         }}
         onRunCompleteDemo={handleRunCompleteDemo}
         isDemoRunning={isDemoRunning}
+      />
+
+      {/* Interactive Hackathon Demo Bar with Live Status & Controls */}
+      <InteractiveDemoBar
+        currentUser={currentUser}
+        users={users}
+        onSelectUser={(u) => setCurrentUser(u)}
+        activeTab={activeTab}
+        setActiveTab={(t) => setActiveTab(t as any)}
+        onRunDemo={handleRunCompleteDemo}
+        onResetDemo={handleResetDemo}
+        isDemoRunning={isDemoRunning}
+        tickets={tickets}
+        reissues={reissues}
       />
 
       <main className="flex-1">

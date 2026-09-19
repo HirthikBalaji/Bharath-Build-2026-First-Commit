@@ -40,9 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-16">
           {/* Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('home')}>
-            <div className="h-10 w-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md shadow-emerald-600/20">
-              <ArrowRightLeft className="w-5 h-5 stroke-[2.5]" />
-            </div>
+            <img src="/logo.svg" alt="SeatRelay" className="h-10 w-10 rounded-xl shadow-md shadow-emerald-600/20 object-contain" />
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold tracking-tight text-slate-900">Seat<span className="text-emerald-600">Relay</span></span>

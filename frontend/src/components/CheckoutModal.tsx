@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, CreditCard, Lock, ShieldCheck, Smartphone } from 'lucide-react';
 import { Bus, ResaleSeatSummary, User } from '../types';
-import { cityCode, formatDate, formatTime, inr, seatTypeLabel } from '../lib/format';
+import { cityCode, formatDate, formatTime, inr, maskId, seatTypeLabel } from '../lib/format';
 import { BerthGlyph, Button, cx, EASE_OUT, Modal, Segmented } from './ui';
 
 interface CheckoutModalProps {
@@ -13,11 +13,6 @@ interface CheckoutModalProps {
   onSuccess: (purchase: any) => void;
 }
 
-const maskId = (v: string) => {
-  const digits = v.replace(/\s/g, '');
-  if (digits.length <= 4) return digits;
-  return `${'•'.repeat(Math.max(0, digits.length - 4)).replace(/(.{4})/g, '$1 ').trim()} ${digits.slice(-4)}`;
-};
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ bus, seat, currentUser, onClose, onSuccess }) => {
   const [passengerName, setPassengerName] = useState(currentUser.name || 'Priya Kumar');

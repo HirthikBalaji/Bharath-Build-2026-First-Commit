@@ -58,7 +58,7 @@ SeatRelay acts as an authorized resale layer between passengers and bus operator
 | Role | Persona in Demo | What They Do |
 |---|---|---|
 | **Seller** | Rahul Sharma (`rahul@example.com`) | Holds confirmed ticket `#SB-92831` (Seat `U12`, ₹850). Releases seat; gets ₹850 refund when sold. |
-| **Buyer** | Priya Kumar (`priya@example.com`) | Searches Bangalore → Chennai (19 Sep 2026), sees sold-out bus with `♻️ SeatRelay` badge, buys at ₹850, receives new QR ticket. |
+| **Buyer** | Priya Kumar (`priya@example.com`) | Searches Bangalore → Chennai (19 Sep 2026), sees the sold-out 22:30 coach with one relayed berth at the printed fare, buys at ₹850, receives a new QR boarding pass. |
 | **Operator** | SwiftBus Operations (`ops@swiftbus.in`) | Simulated GDS portal. Reviews side-by-side identity verification, clicks 1-Click Approve / Reject Reissue. |
 
 ---
@@ -169,11 +169,11 @@ Judges reward transparent scoping:
 |---|---|---|
 | **0:00 - 0:25** | The Problem | Show "Sold Out" route and standard 100% cancellation penalty on screen. Explain why Rahul loses ₹850 while Priya is stranded. |
 | **0:25 - 0:45** | Why Resale Forums Fail | Highlight identity mismatch on boarding, fraudulent duplicate sales, and scalping. |
-| **0:45 - 1:15** | Seller Lists Seat | Log in as Rahul (`RS`). In **My Tickets**, show refund preview: *"Standard Cancel: ₹0 back. SeatRelay: ₹850 back."* Click **Release Seat for Resale**. |
-| **1:15 - 1:40** | Buyer Finds & Claims | Switch to Priya (`PK`). Search Bangalore → Chennai. See `Sold Out` with `♻️ 1 seat available through SeatRelay`. Click buy, input verified ID, and pay face-value ₹850. |
-| **1:40 - 2:10** | Operator Approves | Switch to **SwiftBus Operator Portal**. View side-by-side verification (Rahul vs Priya). Click **Approve Reissue**. |
-| **2:10 - 2:35** | Verification & Reissuance | View Priya's new digital boarding pass with verified dynamic QR code. Check Rahul's profile: ticket invalidated and ₹850 refund completed. Inspect **Public Ledger**. |
-| **2:35 - 2:50** | AWS Architecture | Click **☁️ AWS Architecture** to display the Step Functions state machine and DynamoDB conditional update. |
+| **0:45 - 1:15** | Seller Lists Seat | Sign in as Rahul (demo account button in the sign-in window). In **My journeys**, click **Release this seat** and show the refund preview: *"Cancel with the operator now: ₹0. Release on SeatRelay: ₹850."* |
+| **1:15 - 1:40** | Buyer Finds & Claims | Open **Find a seat** and search Bangalore → Chennai. The 22:30 coach is sold out with berth U12 released at the printed fare. Click it (the app switches to Priya, the demo buyer), enter passenger details and ID, and pay ₹850. |
+| **1:40 - 2:10** | Operator Approves | Sign in as SwiftBus (operator demo account). In **Dispatch**, compare who comes off the manifest and who goes on. Click **Approve reissue**. |
+| **2:10 - 2:35** | Verification & Reissuance | Sign in as Priya and open **My journeys → Boarding pass** (reissued, with QR). Rahul's card shows Transferred and ₹850 refunded. Open the **Ledger**. |
+| **2:35 - 2:50** | AWS Architecture | Open **Platform → Reference architecture** (or press Ctrl K) to show the Step Functions state machine and the DynamoDB conditional update. |
 | **2:50 - 3:00** | Closing Summary | *"Nobody loses the fare, nobody misses the bus, and everyone on board is on the record."* |
 
 ---
@@ -199,9 +199,15 @@ npx vite --host 0.0.0.0 --port 5173
 - **Frontend:** `http://localhost:5173`
 - **Backend API:** `http://localhost:4000`
 
+### Demo controls
+- **Demo accounts:** the sign-in window has one-tap buttons for Rahul (seller), Priya (buyer) and SwiftBus (operator).
+- **Live walkthrough / Reset demo data:** in the account menu (top right) and the command menu (Ctrl K).
+- **Light and dark:** pull the cord hanging at the top right of the page.
+
 ---
 
 ## 12. AI Tools Used
 
 In accordance with hackathon guidelines:
 - **Google Antigravity Agentic Assistant:** End-to-end fullstack architecture, React component synthesis, workflow state machine modeling, and documentation.
+- **Claude Code (Anthropic):** Solution design review and the frontend redesign (design system, light and dark themes, motion, and all screens).

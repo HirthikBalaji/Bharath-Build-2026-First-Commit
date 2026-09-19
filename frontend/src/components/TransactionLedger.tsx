@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, RefreshCw } from 'lucide-react';
 import { ResaleTransaction } from '../types';
-import { formatDateTime, inr } from '../lib/format';
+import { formatDateTime, inr, maskId } from '../lib/format';
 import { Button, CountUp, cx, EmptyState, PageHeader, Pill, Segmented } from './ui';
 
 interface TransactionLedgerProps {
@@ -118,15 +118,21 @@ export const TransactionLedger: React.FC<TransactionLedgerProps> = ({ transactio
                       </td>
                       <td className="px-5 py-4">
                         <span className="text-ink">{tx.buyerPassengerName}</span>
-                        <span className="code block text-xs text-ink3">{tx.buyerGovIdType} {tx.buyerGovIdNumber}</span>
+                        <span className="code block text-xs text-ink3">{tx.buyerGovIdType} {maskId(tx.buyerGovIdNumber)}</span>
                       </td>
                       <td className="px-5 py-4">
                         <span className="num font-semibold text-ink">{inr(tx.resalePrice)}</span>
                         <span className="block text-xs text-ink3">fee {inr(tx.platformFee)}</span>
                       </td>
                       <td className="px-5 py-4">
-                        <span className="num font-semibold text-accent">{inr(tx.sellerRefundAmount)}</span>
-                        <span className="code block text-xs text-ink3">{tx.refundReferenceId || 'pending'}</span>
+                        {bucket(tx.status) === 'declined' ? (
+                          <span className="text-ink3">None, sale declined</span>
+                        ) : (
+                          <>
+                            <span className="num font-semibold text-accent">{inr(tx.sellerRefundAmount)}</span>
+                            <span className="code block text-xs text-ink3">{tx.refundReferenceId || 'on reissue'}</span>
+                          </>
+                        )}
                       </td>
                       <td className="px-5 py-4">{statusPill(tx.status)}</td>
                     </motion.tr>

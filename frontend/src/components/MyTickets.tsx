@@ -21,8 +21,13 @@ const stageOf = (t: Ticket) => {
   if (t.status === 'INVALIDATED' || l?.status === 'COMPLETED') return 4;
   if (!l) return 0;
   if (l.status === 'PURCHASED') return 2;
-  if (l.status === 'LISTED') return 1;
   return 1;
+};
+
+/** The transfer that matters for this listing: the completed one if any, else the latest. */
+const settledTx = (t: Ticket) => {
+  const txs = t.activeListing?.transactions ?? [];
+  return txs.find((x: any) => x.status === 'COMPLETED') ?? txs[txs.length - 1];
 };
 
 export const MyTickets: React.FC<MyTicketsProps> = ({ currentUser, tickets, isLoading, onRefresh, onViewQR }) => {
@@ -206,12 +211,13 @@ const JourneyCard: React.FC<{ ticket: Ticket; onRelease: () => void; onWithdraw:
   onWithdraw,
   onViewQR,
 }) => {
-  const listed = t.status === 'LISTED_FOR_RESALE';
   const invalid = t.status === 'INVALIDATED';
-  const confirmed = t.status === 'CONFIRMED';
+  const listingOpen = t.activeListing?.status === 'LISTED' || t.activeListing?.status === 'PURCHASED';
+  const listed = !invalid && (t.status === 'LISTED_FOR_RESALE' || listingOpen);
+  const confirmed = t.status === 'CONFIRMED' && !listed;
   const reissuedToMe = t.ticketNumber?.startsWith('SR-');
   const stage = stageOf(t);
-  const tx = t.activeListing?.transactions?.[0];
+  const tx = settledTx(t);
   const refund = tx?.sellerRefundAmount ?? t.activeListing?.expectedRefund ?? t.fare;
 
   const status = invalid ? (

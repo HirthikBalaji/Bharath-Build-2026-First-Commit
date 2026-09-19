@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Check, CheckCircle2, Clock, RefreshCw, X } from 'lucide-react';
 import { ReissueRequestItem } from '../types';
-import { formatDate, formatTime, inr, timeAgo } from '../lib/format';
+import { formatDate, formatTime, inr, maskId, timeAgo } from '../lib/format';
 import { BerthGlyph, Button, CountUp, cx, EASE_OUT, EmptyState, Modal, PageHeader, Pill } from './ui';
 
 interface OperatorDashboardProps {
@@ -154,7 +154,7 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({ reissues, 
                         <dl className="mt-4 space-y-2 text-sm">
                           <Row k="Age · gender" v={`${r.newPassenger.age} · ${r.newPassenger.gender}`} />
                           <Row k="Phone" v={<span className="code">{r.newPassenger.phone}</span>} />
-                          <Row k={r.newPassenger.govIdType} v={<span className="code">{r.newPassenger.govIdNumber}</span>} />
+                          <Row k={r.newPassenger.govIdType} v={<span className="code">{maskId(r.newPassenger.govIdNumber)}</span>} />
                           <Row k="Paid, held" v={<span className="font-semibold text-ink">{inr(r.resalePrice)}</span>} />
                         </dl>
                       </div>
@@ -220,7 +220,7 @@ export const OperatorDashboard: React.FC<OperatorDashboardProps> = ({ reissues, 
                       </td>
                       <td className="px-5 py-4">
                         <span className="font-semibold text-ink">{r.newPassenger.name}</span>
-                        <span className="code block text-xs text-ink3">{r.newPassenger.govIdNumber}</span>
+                        <span className="code block text-xs text-ink3">{maskId(r.newPassenger.govIdNumber)}</span>
                       </td>
                       <td className="code px-5 py-4 text-accent">{r.newTicket ? r.newTicket.ticketNumber : '·'}</td>
                       <td className="num px-5 py-4 font-semibold text-ink">{r.status === 'COMPLETED' ? inr(r.sellerRefundAmount) : '·'}</td>

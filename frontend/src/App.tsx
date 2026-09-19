@@ -439,9 +439,18 @@ function Shell() {
                 initial={searchQuery}
                 onSearch={(f, t, d) => fetchBuses(f, t, d)}
                 onSelectResaleSeat={(bus, seat) => {
-                  // Ensure we are shopping as Priya (buyer) if not already
-                  const buyerUser = users.find((u) => u.role === 'buyer') || currentUser;
-                  if (buyerUser) setCurrentUser(buyerUser);
+                  if (currentUser?.role === 'buyer') {
+                    setSelectedSeatForCheckout({ bus, seat });
+                    return;
+                  }
+                  // Demo convenience: step into the demo buyer so the seller is not buying their own seat
+                  const demoBuyer = users.find((u) => u.role === 'buyer');
+                  if (!demoBuyer) {
+                    openAuth('login');
+                    return;
+                  }
+                  setCurrentUser(demoBuyer);
+                  notify({ tone: 'info', title: `Claiming as ${demoBuyer.name}`, body: 'Switched to the demo buyer. Sign in to claim as yourself.' });
                   setSelectedSeatForCheckout({ bus, seat });
                 }}
               />

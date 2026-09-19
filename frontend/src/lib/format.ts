@@ -95,3 +95,13 @@ export const addDays = (isoDate: string, days: number) => {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 };
+
+/** Show only the last four characters of an ID number. Already-masked values pass through. */
+export const maskId = (v?: string | null) => {
+  if (!v) return '';
+  // Already masked by the API (e.g. "XXXX XXXX 4821"): four or more mask characters up front.
+  if (/^[X•*](?:[\sX•*]){3,}/i.test(v.trim())) return v;
+  const chars = v.replace(/\s/g, '');
+  if (chars.length <= 4) return chars;
+  return `${'•'.repeat(chars.length - 4).replace(/(.{4})/g, '$1 ').trim()} ${chars.slice(-4)}`;
+};

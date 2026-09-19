@@ -103,7 +103,7 @@ app.get('/health', (req, res) => {
 // ==========================================
 app.get('/api/buses/search', (req, res) => {
   try {
-    const { from, to, date } = req.query;
+    const { from, to, date, live } = req.query;
 
     let sql = `
       SELECT b.*, o.name as operatorName, o.code as operatorCode,
@@ -113,6 +113,12 @@ app.get('/api/buses/search', (req, res) => {
       WHERE 1=1
     `;
     const params = [];
+
+    if (live === '1' || live === 'true') {
+      sql += ` AND b.isLive = 1`;
+    } else if (live === '0' || live === 'false') {
+      sql += ` AND (b.isLive = 0 OR b.isLive IS NULL)`;
+    }
 
     if (from) {
       sql += ` AND LOWER(b.routeFrom) LIKE LOWER(?)`;
@@ -253,6 +259,17 @@ app.get('/api/tickets/my', requireAuth, (req, res) => {
     });
 
     res.json(formatted);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/buses/:id/seats
+app.get('/api/buses/:id/seats', (req, res) => {
+  try {
+    const busId = req.params.id;
+    const seats = DatabaseService.query(`SELECT * FROM seats WHERE busId = ? ORDER BY seatNumber ASC`, [busId]);
+    res.json(seats);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -673,8 +690,8 @@ app.post('/api/operator/buses', requireOperator, (req, res) => {
 
     const queries = [
       {
-        sql: `INSERT INTO buses (id, operatorId, busNumber, busType, routeFrom, routeTo, departureTime, arrivalTime, travelDate, baseFare, createdAt)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        sql: `INSERT INTO buses (id, operatorId, busNumber, busType, routeFrom, routeTo, departureTime, arrivalTime, travelDate, baseFare, isLive, createdAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
         params: [busId, operator.id, busNumber.trim().toUpperCase(), busType || 'AC Sleeper (2+1)', routeFrom.trim(), routeTo.trim(), departureTime, arrivalTime, travelDate, Number(baseFare), now]
       }
     ];

@@ -55,6 +55,7 @@ def init_db():
         arrivalTime TEXT NOT NULL,
         travelDate TEXT NOT NULL,
         baseFare REAL NOT NULL,
+        isLive INTEGER NOT NULL DEFAULT 0,
         createdAt TEXT NOT NULL,
         FOREIGN KEY (operatorId) REFERENCES operators(id)
     );

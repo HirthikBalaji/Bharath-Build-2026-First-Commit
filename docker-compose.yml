@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: seatrelay-backend
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - DATABASE_URL=file:/app/seatrelay.db
+    volumes:
+      - seatrelay_data:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: seatrelay-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  seatrelay_data:

@@ -210,7 +210,7 @@ export const SearchBuses: React.FC<SearchBusesProps> = ({ buses, isLoading, onSe
             title="No coaches match"
             body={
               <>
-                Try <button className="font-semibold text-accent underline-offset-4 hover:underline" onClick={() => setActiveFilter('all')}>all coaches</button>, or search Bangalore to Chennai on 19 September to see the demo route.
+                Try <button className="font-semibold text-accent underline-offset-4 hover:underline" onClick={() => setActiveFilter('all')}>all coaches</button>, or search Bangalore to Chennai on tonight's departures to see the demo route.
               </>
             }
           />

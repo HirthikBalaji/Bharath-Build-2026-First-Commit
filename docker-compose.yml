@@ -1,24 +1,27 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: seatrelay-backend
+    restart: unless-stopped
+    expose:
+      - "4000"
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     environment:
       - PORT=4000
-      - DATABASE_URL=file:/app/seatrelay.db
+      - SEATRELAY_DB_PATH=/app/data/seatrelay.db
+      - DATABASE_URL=file:/app/data/seatrelay.db
     volumes:
-      - seatrelay_data:/app
+      - seatrelay_data:/app/data
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: seatrelay-frontend
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:

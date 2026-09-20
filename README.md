@@ -204,6 +204,18 @@ npx vite --host 0.0.0.0 --port 5173
 - **Live walkthrough / Reset demo data:** in the account menu (top right) and the command menu (Ctrl K).
 - **Light and dark:** pull the cord hanging at the top right of the page.
 
+### Run the whole stack with Docker
+```bash
+docker compose up -d --build
+```
+Frontend on `http://localhost`, with `/api` proxied to the backend. The SQLite
+database is seeded on first start and kept in the `seatrelay_data` volume.
+
+### Deploy to AWS
+One EC2 Free Tier instance runs both containers - see **[DEPLOY_AWS.md](DEPLOY_AWS.md)**
+for instance sizing, the security group rules, the user-data bootstrap script and the
+update/teardown steps.
+
 ---
 
 ## 12. AI Tools Used

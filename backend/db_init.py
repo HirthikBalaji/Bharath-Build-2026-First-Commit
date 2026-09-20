@@ -1,11 +1,14 @@
+import os
 import sqlite3
 import json
 import uuid
 from datetime import datetime
 
-DB_PATH = 'backend/seatrelay.db'
+DB_PATH = os.environ.get('SEATRELAY_DB_PATH', 'backend/seatrelay.db')
 
 def get_db():
+    parent = os.path.dirname(os.path.abspath(DB_PATH))
+    os.makedirs(parent, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn

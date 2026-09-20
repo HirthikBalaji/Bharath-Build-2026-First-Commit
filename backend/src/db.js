@@ -1,7 +1,9 @@
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const DB_PATH = path.resolve(__dirname, '../../backend/seatrelay.db');
+const DB_PATH = process.env.SEATRELAY_DB_PATH
+  ? path.resolve(process.env.SEATRELAY_DB_PATH)
+  : path.resolve(__dirname, '../../backend/seatrelay.db');
 
 class DatabaseService {
   /**

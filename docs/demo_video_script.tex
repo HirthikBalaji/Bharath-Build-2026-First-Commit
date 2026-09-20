@@ -1,0 +1,202 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{newunicodechar}
+
+% Define rupee symbol fallback for standard pdflatex / xetex
+\newcommand{\inr}{Rs.~}
+
+% Adjust header height for fancyhdr
+\setlength{\headheight}{14pt}
+
+% Colors
+\definecolor{primary}{RGB}{15, 23, 42}
+\definecolor{accent}{RGB}{13, 148, 136}
+\definecolor{awsorange}{RGB}{234, 88, 12}
+\definecolor{boxbg}{RGB}{248, 250, 252}
+\definecolor{boxborder}{RGB}{226, 232, 240}
+\definecolor{cuecolor}{RGB}{100, 116, 139}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=accent,
+    filecolor=accent,      
+    urlcolor=accent,
+    pdftitle={SeatRelay - 3-Minute Video Demo Script},
+    pdfpagemode=FullScreen,
+}
+
+% Header and Footer
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\textbf{\textcolor{primary}{SeatRelay}} \textcolor{cuecolor}{| Video Demo Script}}
+\lhead{\textcolor{awsorange}{\textbf{AWS $\times$ WeMakeDevs Bharat Builds 2026}}}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Section styling
+\titleformat{\section}{\large\bfseries\color{primary}}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries\color{accent}}{}{0em}{}
+
+% Custom box for visual cues
+\newtcolorbox{visualcue}[1][]{
+    colback=boxbg,
+    colframe=boxborder,
+    coltitle=primary,
+    fonttitle=\bfseries\small,
+    title={Visual \& On-Screen Action},
+    arc=2mm,
+    boxrule=0.8pt,
+    #1
+}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{\textcolor{primary}{SeatRelay: Operator-Authorized Bus Seat Resale}}}\\[0.3em]
+    {\large \textbf{\textcolor{accent}{3-Minute Video Demo \& Architecture Script}}}\\[0.4em]
+    \textcolor{cuecolor}{\small Built for First Commit (Bharat Builds Tour, WeMakeDevs $\times$ AWS) | Target Duration: 2m 45s -- 3m 00s}
+\end{center}
+
+\vspace{0.3em}
+
+\begin{tcolorbox}[colback=primary!5,colframe=primary,title=\textbf{Submission Requirements Checklist Met},fonttitle=\small\bfseries,boxrule=1pt,arc=2mm]
+\small
+\begin{tabularx}{\textwidth}{l X}
+$\checkmark$ \textbf{About the project:} & Real problem of 100\% last-minute cancellation loss vs.\ sold-out routes in India.\\
+$\checkmark$ \textbf{Tech stack \& architecture:} & Full-stack React + TypeScript + AWS Serverless architecture.\\
+$\checkmark$ \textbf{How AWS is used:} & Step Functions state machine, DynamoDB atomic conditional writes, EventBridge, S3, Cognito.\\
+$\checkmark$ \textbf{Novelty \& Innovation:} & RBI e-Rupee (CBDC) programmable token escrow with T+0 instant multi-party settlement.\\
+$\checkmark$ \textbf{Learning \& growth:} & Sovereign India-Stack integration (DigiLocker + e-Rupee) alongside AWS event-driven systems.\\
+\end{tabularx}
+\end{tcolorbox}
+
+\vspace{0.3em}
+
+\section*{Script Timeline Overview}
+
+\noindent
+\begin{tabularx}{\textwidth}{|c|l|X|}
+\hline
+\textbf{Time} & \textbf{Section} & \textbf{Core Topic} \\
+\hline
+0:00 -- 0:40 & Part 1: Project Overview \& Problem & Fare waste vs.\ sold-out buses; why open forums fail \\
+0:40 -- 1:30 & Part 2: End-to-End Live Product Demo & Seller release $\rightarrow$ DigiLocker \& e-Rupee claim $\rightarrow$ Operator 1-click reissue \\
+1:30 -- 2:20 & Part 3: Tech Stack \& AWS Cloud & Step Functions, DynamoDB conditional writes, EventBridge, Cognito \\
+2:20 -- 2:45 & Part 4: Novelty \& India Stack & RBI e-Rupee (CBDC) programmable smart contract escrow ($T+0$ payout) \\
+2:45 -- 3:00 & Part 5: Key Learnings \& Conclusion & Regulatory compliance (DPDP), transit security, closing summary \\
+\hline
+\end{tabularx}
+
+\vspace{0.6em}
+
+\section*{Detailed Video Script}
+
+\subsection*{Part 1: The Problem \& Project Overview (0:00 -- 0:40)}
+
+\begin{visualcue}
+Open on the live SeatRelay landing page. Show the headline \textbf{``SeatRelay: Your seat doesn't have to go to waste''}. Hover over a search result showing \textbf{``Sold Out''} next to a 100\% cancellation penalty window on a carrier ticket.
+\end{visualcue}
+
+\noindent\textbf{Spoken Script:}
+\begin{quote}
+\textit{``Namaste! In India, millions of intercity bus seats go to waste every week. When a traveller's plans change close to departure, cancellation charges hit 100\%---a complete loss of their fare. At the exact same minute, another passenger searching that identical route sees `Sold Out'.}
+
+\textit{Why can't travellers just give their ticket to someone else? Because tickets carry government photo IDs! Open ticket reselling fails: buyers get turned away at boarding, tickets get fraudulently sold twice, or scalpers inflate prices.}
+
+\textit{Introducing \textbf{SeatRelay}: India's first operator-authorized bus seat resale protocol. We enable confirmed tickets to change hands at \textbf{exact face value} up to departure, with zero scalping, cryptographic identity verification, and authentic manifest reissuance directly on the operator's official manifest.''}
+\end{quote}
+
+\vspace{0.4em}
+
+\subsection*{Part 2: Three-Persona End-to-End Walkthrough (0:40 -- 1:30)}
+
+\begin{visualcue}
+Walk through the 3 personas in real time:
+\begin{enumerate}[noitemsep,topsep=0pt]
+    \item \textbf{Seller (Rahul):} In \textit{My Journeys}, click \textbf{``Release this seat''} on Bangalore $\rightarrow$ Chennai. Show \inr 850 refund preview.
+    \item \textbf{Buyer (Priya):} Search route, find berth U12, initiate \textbf{DigiLocker Aadhaar e-KYC}, and select \textbf{e-Rupee (CBDC)} checkout.
+    \item \textbf{Operator (SwiftBus):} In \textit{Dispatch}, show side-by-side manifest change and click \textbf{``Approve Reissue''}.
+\end{enumerate}
+\end{visualcue}
+
+\noindent\textbf{Spoken Script:}
+\begin{quote}
+\textit{``Here is how the protocol functions in real life across three personas:}
+
+\textit{\textbf{1. The Seller:} Rahul holds confirmed seat U12 on a Bangalore to Chennai sleeper at \inr 850. Two hours before departure, standard cancellation gives him \inr 0. He clicks \textbf{`Release this seat'}. His ticket remains valid until someone buys it.}
+
+\textit{\textbf{2. The Buyer:} Priya searches the route, finds Rahul's released berth at the exact \inr 850 face-value fare. Before booking, she verifies her legal identity in one tap via our integrated \textbf{DigiLocker Aadhaar e-KYC gateway}. At checkout, she selects \textbf{RBI e-Rupee (CBDC)}, locking the fare into a programmable smart contract escrow.}
+
+\textit{\textbf{3. The Operator:} In the SwiftBus dispatch console, the operator sees a real-time manifest comparison: Rahul off, Priya on with verified ID. With \textbf{one click}, the operator signs the reissue. Rahul's ticket is invalidated, Priya receives an authentic encrypted QR boarding pass, and Rahul gets an instant, automated refund.''}
+\end{quote}
+
+\vspace{0.4em}
+
+\subsection*{Part 3: Tech Stack \& AWS Cloud Architecture (1:30 -- 2:20)}
+
+\begin{visualcue}
+Open the \textbf{AWS Reference Architecture Modal} or highlight the architecture block diagram showing Step Functions, DynamoDB, EventBridge, Lambda, Cognito, and S3.
+\end{visualcue}
+
+\noindent\textbf{Spoken Script:}
+\begin{quote}
+\textit{``Under the hood, SeatRelay is built on an enterprise-grade AWS Serverless architecture designed for zero data loss and massive holiday demand spikes:''}
+
+\begin{itemize}[noitemsep,topsep=2pt]
+    \item \textbf{AWS Amplify Hosting \& Amazon Cognito:} Powers our responsive React, TypeScript, and Tailwind frontend with role-based access control for travellers and fleet operators.
+    \item \textbf{Amazon API Gateway \& AWS Lambda:} RESTful serverless microservices executing atomic listing, search, and settlement validations.
+    \item \textbf{Amazon DynamoDB Atomic One-Buyer Guarantee:} Built using conditional expressions (\texttt{attribute\_exists(listingId) AND status = 'LISTED'}). When 50 buyers tap Claim in the same millisecond on a festival weekend, DynamoDB guarantees strictly \textbf{one} write succeeds. The other 49 receive a clean 409 Conflict with zero accidental charges.
+    \item \textbf{AWS Step Functions Centerpiece:} Coordinates the transfer state machine. It enforces the 10-minute checkout window, pauses on a task token awaiting operator approval, and orchestrates atomic rollbacks if declined.
+    \item \textbf{Amazon EventBridge Scheduler:} Spawns precision one-shot timers per listing, auto-expiring unsold seats at $T-60$ minutes so the seller retains standard operator cancellation rights.
+    \item \textbf{Amazon S3 \& SNS:} Manages encrypted QR boarding passes and distributes real-time SMS/email alerts at every state transition.
+\end{itemize}
+\end{quote}
+
+\vspace{0.4em}
+
+\subsection*{Part 4: Novelty --- Sovereign India Stack \& RBI e-Rupee Escrow (2:20 -- 2:45)}
+
+\begin{visualcue}
+Switch to the \textbf{RBI e-Rupee Programmable Escrow Explorer} tab in the Live Portal. Highlight the contract address, SHA-256 escrow lock hash, and the \textbf{``T+0 Settled''} instant multi-party split badge.
+\end{visualcue}
+
+\noindent\textbf{Spoken Script:}
+\begin{quote}
+\textit{``Our primary technological novelty addresses India's refund friction. Traditional bank refunds take 2 to 5 business days. SeatRelay integrates \textbf{RBI Central Bank Digital Currency (CBDC / e-Rupee) Programmable Smart Contracts}.}
+
+\textit{When the buyer checks out, e-Rupee tokens are encumbered with a strict programmability rule: unlock only upon operator cryptographic authorization. The millisecond the operator approves, an \textbf{atomic multi-party split executes at T+0 real-time speed}---delivering an instant face-value refund to the seller's wallet with zero intermediary delay.''}
+\end{quote}
+
+\vspace{0.4em}
+
+\subsection*{Part 5: Learnings \& Closing Summary (2:45 -- 3:00)}
+
+\begin{visualcue}
+Return to the main dashboard or full-screen presenter view with GitHub repository URL and deployment links displayed on screen.
+\end{visualcue}
+
+\noindent\textbf{Spoken Script:}
+\begin{quote}
+\textit{``Building SeatRelay gave us deep hands-on experience orchestrating AWS distributed systems under stringent DPDP Act 2023 privacy rules and real-world transit constraints.}
+
+\textit{With SeatRelay: \textbf{Nobody loses their fare, nobody misses the bus, and every passenger on board is on the record.} Thank you!''}
+\end{quote}
+
+\vspace{0.8em}
+\hrule
+\vspace{0.4em}
+\begin{center}
+\small\textcolor{cuecolor}{Compiled for SeatRelay Demonstration | First Commit Hackathon 2026}
+\end{center}
+
+\end{document}

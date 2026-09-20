@@ -709,10 +709,10 @@ const Portals: React.FC<{ currentUser: User | null; onSelectRole: HomePageProps[
       <Container>
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <RevealText as="h2" text="Board as." className="display text-[clamp(2.4rem,5vw,4rem)] text-ink" />
-          <p className="max-w-sm text-[1.0625rem] text-ink2">Two demo travellers are ready. Pick a side of the transfer.</p>
+          <p className="max-w-sm text-[1.0625rem] text-ink2">Three demo personas ready with single-click sign-in: Seller, Buyer, and Operator.</p>
         </div>
 
-        <div className={cx('mt-12 grid gap-5', isOperator ? 'lg:grid-cols-3' : 'lg:grid-cols-2')}>
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
           <Rise>
             <Spotlight className="flex h-full flex-col rounded-2xl border border-line bg-surface p-7 sm:p-9">
               <div className="flex items-center justify-between">
@@ -769,26 +769,24 @@ const Portals: React.FC<{ currentUser: User | null; onSelectRole: HomePageProps[
             </Spotlight>
           </Rise>
 
-          {isOperator && (
-            <Rise delay={0.16}>
-              <Spotlight className="flex h-full flex-col rounded-2xl bg-coach p-7 text-coachink sm:p-9">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-coachink/10 px-2.5 text-xs font-semibold">
-                    <Building2 className="h-3.5 w-3.5" /> Operator
-                  </span>
-                  <span className="code text-xs text-coachink/70">ops@swiftbus.in</span>
-                </div>
-                <h3 className="display-md mt-8 text-[2rem]">SwiftBus Dispatch</h3>
-                <p className="mt-2 text-coachink/75">Approve transfers, keep the manifest true, release refunds.</p>
-                <div className="mt-auto pt-8">
-                  <Button className="w-full" size="lg" variant="inverse" onClick={() => onSelectRole('operator', 'operator')}>
-                    Open dispatch console
-                    <ArrowUpRight className="h-[18px] w-[18px]" />
-                  </Button>
-                </div>
-              </Spotlight>
-            </Rise>
-          )}
+          <Rise delay={0.16}>
+            <Spotlight className="flex h-full flex-col rounded-2xl bg-coach p-7 text-coachink sm:p-9">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-coachink/10 px-2.5 text-xs font-semibold">
+                  <Building2 className="h-3.5 w-3.5" /> Operator
+                </span>
+                <span className="code text-xs text-coachink/70">ops@swiftbus.in</span>
+              </div>
+              <h3 className="display-md mt-8 text-[2rem]">SwiftBus Dispatch</h3>
+              <p className="mt-2 text-coachink/75">Approve transfers, keep the manifest true, release refunds.</p>
+              <div className="mt-auto pt-8">
+                <Button className="w-full" size="lg" variant="inverse" onClick={() => onSelectRole('operator', 'operator')}>
+                  Sign in as SwiftBus
+                  <ArrowUpRight className="h-[18px] w-[18px]" />
+                </Button>
+              </div>
+            </Spotlight>
+          </Rise>
         </div>
       </Container>
     </section>

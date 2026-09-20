@@ -134,7 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     setMobileOpen(false);
   };
 
-  const personas = users.filter((u) => u.role === 'seller' || u.role === 'buyer');
+  const personas = users;
 
   return (
     <>
@@ -332,10 +332,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                           <Pill tone="coach" className="ml-auto capitalize">{currentUser.role}</Pill>
                         </div>
 
-                        {personas.length > 1 && !isOperator && (
+                        {personas.length > 1 && (
                           <div className="px-2 pb-1 pt-3">
-                            <p className="kicker mb-2 text-ink3">Travel as</p>
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <p className="kicker mb-2 text-ink3">Switch persona</p>
+                            <div className="grid grid-cols-3 gap-1.5">
                               {personas.map((p) => (
                                 <button
                                   key={p.id}
@@ -344,12 +344,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     close();
                                   }}
                                   className={cx(
-                                    'rounded-lg border px-2.5 py-2 text-left transition-colors',
+                                    'rounded-lg border px-2 py-2 text-left transition-colors',
                                     p.id === currentUser.id ? 'border-coach bg-coach/5 dark:border-accent' : 'border-line hover:border-linestrong'
                                   )}
                                 >
-                                  <span className="block truncate text-sm font-semibold text-ink">{p.name.split(' ')[0]}</span>
-                                  <span className="block text-[0.6875rem] text-ink3">{p.role === 'seller' ? 'Releasing a seat' : 'Looking for one'}</span>
+                                  <span className="block truncate text-xs font-semibold text-ink">{p.name.split(' ')[0]}</span>
+                                  <span className="block text-[0.625rem] capitalize text-ink3">{p.role}</span>
                                 </button>
                               ))}
                             </div>

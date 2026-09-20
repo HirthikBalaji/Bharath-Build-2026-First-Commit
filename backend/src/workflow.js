@@ -307,7 +307,7 @@ class ResaleWorkflowService {
       SELECT tx.*, l.ticketId, l.sellerId, l.originalPrice, l.resalePrice,
              t.ticketNumber as origTicketNumber, t.passengerName as origPaxName,
              s.id as seatId, s.seatNumber, s.seatType,
-             b.id as busId, b.busNumber, b.busType, b.routeFrom, b.routeTo, b.travelDate, b.departureTime,
+             b.id as busId, b.busNumber, b.busType, b.routeFrom, b.routeTo, b.travelDate, b.departureTime, b.arrivalTime,
              o.name as operatorName, o.code as operatorCode,
              uSeller.email as sellerEmail, uBuyer.email as buyerEmail
       FROM resale_transactions tx
@@ -441,7 +441,16 @@ class ResaleWorkflowService {
     return {
       success: true,
       transaction: DatabaseService.get(`SELECT * FROM resale_transactions WHERE id = ?`, [tx.id]),
-      newTicket: DatabaseService.get(`SELECT * FROM tickets WHERE id = ?`, [newTicketId]),
+      newTicket: DatabaseService.get(`
+        SELECT t.*, b.routeFrom, b.routeTo, b.departureTime, b.arrivalTime,
+               b.travelDate, b.busNumber, b.busType, o.name as operatorName,
+               s.seatNumber, s.seatType
+        FROM tickets t
+        JOIN buses b ON t.busId = b.id
+        JOIN operators o ON b.operatorId = o.id
+        JOIN seats s ON t.seatId = s.id
+        WHERE t.id = ?
+      `, [newTicketId]),
       refund: DatabaseService.get(`SELECT * FROM refunds WHERE id = ?`, [refundId]),
       cbdcSettlement,
       operatorAuth: opResp.operator_auth_code

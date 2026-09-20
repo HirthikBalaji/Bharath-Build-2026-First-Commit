@@ -182,21 +182,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
           {mode === 'login' && (
             <div className="mt-8 border-t border-line pt-6">
-              <p className="text-sm font-medium text-ink2">Demo accounts</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-ink2">Single-click demo login</p>
+                <span className="text-[0.6875rem] text-accent">1-click switch</span>
+              </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {DEMO.map((d) => (
                   <button
                     key={d.email}
                     type="button"
-                    aria-label={`Use the ${d.label} demo account (${d.role})`}
-                    onClick={() => {
+                    disabled={isLoading}
+                    aria-label={`Instant sign in as ${d.label} (${d.role})`}
+                    onClick={async () => {
                       setEmail(d.email);
                       setPassword(d.password);
                       setError(null);
+                      setIsLoading(true);
+                      try {
+                        const res = await fetch('/api/auth/login', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: d.email, password: d.password }),
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Sign in failed');
+                        localStorage.setItem('seatrelay_token', data.token);
+                        localStorage.setItem('seatrelay_user', JSON.stringify(data.user));
+                        onSuccess(data.user, data.token);
+                        onClose();
+                      } catch (err: any) {
+                        setError(err.message);
+                      } finally {
+                        setIsLoading(false);
+                      }
                     }}
-                    className={cx('rounded-lg border px-3 py-2.5 text-left transition-colors hover:border-linestrong', email === d.email ? 'border-coach dark:border-accent' : 'border-line')}
+                    className={cx(
+                      'group rounded-lg border px-3 py-2.5 text-left transition-all hover:border-linestrong hover:shadow-sm active:scale-95',
+                      d.role === 'Operator' ? 'border-coach/40 bg-coach/5' : 'border-line'
+                    )}
                   >
-                    <span className="block text-sm font-semibold text-ink">{d.label}</span>
+                    <span className="flex items-center justify-between">
+                      <span className="block text-sm font-semibold text-ink">{d.label}</span>
+                      <span className="text-[0.625rem] text-ink3 group-hover:text-accent">Login →</span>
+                    </span>
                     <span className="block text-xs text-ink3">{d.role}</span>
                   </button>
                 ))}

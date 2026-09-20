@@ -10,7 +10,24 @@ interface DigitalTicketModalProps {
   onClose: () => void;
 }
 
-export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({ ticket, onClose }) => {
+export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({ ticket: initialTicket, onClose }) => {
+  const [ticket, setTicket] = React.useState<Ticket>(initialTicket);
+
+  React.useEffect(() => {
+    setTicket(initialTicket);
+    // If ticket is missing joined coach fields (common when passed directly from mutation response), fetch full ticket
+    if (initialTicket.id && (!initialTicket.operatorName || !initialTicket.routeFrom)) {
+      fetch(`/api/tickets/${initialTicket.id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((full) => {
+          if (full && full.id) {
+            setTicket((prev) => ({ ...prev, ...full }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [initialTicket]);
+
   const reissued = ticket.ticketNumber?.startsWith('SR-');
   const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);

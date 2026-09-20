@@ -12,6 +12,16 @@ dnf install -y docker git
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
+# t3.micro has 1 GB of RAM and the Vite build gets OOM-killed without swap.
+# Create it before the first build rather than after it fails.
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=2048
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >>/etc/fstab
+fi
+
 # Compose v2 as a docker CLI plugin
 PLUGIN_DIR=/usr/libexec/docker/cli-plugins
 mkdir -p "$PLUGIN_DIR"

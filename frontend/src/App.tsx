@@ -65,7 +65,8 @@ function Shell() {
   const [reissues, setReissues] = useState<ReissueRequestItem[]>([]);
   const [transactions, setTransactions] = useState<ResaleTransaction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [searchQuery, setSearchQuery] = useState({ from: 'Bangalore', to: 'Chennai', date: '2026-09-19' });
+  // The date is discovered from the API on first load, so the app always lands on the day the coaches actually run.
+  const [searchQuery, setSearchQuery] = useState({ from: 'Bangalore', to: 'Chennai', date: '' });
 
   // Loading states
   const [isBusesLoading, setIsBusesLoading] = useState(false);
@@ -185,9 +186,14 @@ function Shell() {
     setIsBusesLoading(true);
     setSearchQuery({ from, to, date });
     try {
-      const res = await fetch(`/api/buses/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${encodeURIComponent(date)}`);
+      const params = new URLSearchParams({ from, to });
+      if (date) params.set('date', date);
+      const res = await fetch(`/api/buses/search?${params.toString()}`);
       const data = await res.json();
-      setBuses(Array.isArray(data) ? data : []);
+      const list: Bus[] = Array.isArray(data) ? data : [];
+      setBuses(list);
+      // First load has no date yet: adopt the date the coaches actually run on.
+      if (!date) setSearchQuery({ from, to, date: list[0]?.travelDate ?? new Date().toISOString().slice(0, 10) });
     } catch (e) {
       console.error(e);
       notify({ tone: 'error', title: 'Could not load coaches', body: 'Check that the SeatRelay API is running, then search again.' });

@@ -58,7 +58,7 @@ SeatRelay acts as an authorized resale layer between passengers and bus operator
 | Role | Persona in Demo | What They Do |
 |---|---|---|
 | **Seller** | Rahul Sharma (`rahul@example.com`) | Holds confirmed ticket `#SB-92831` (Seat `U12`, ₹850). Releases seat; gets ₹850 refund when sold. |
-| **Buyer** | Priya Kumar (`priya@example.com`) | Searches Bangalore → Chennai (19 Sep 2026), sees the sold-out 22:30 coach with one relayed berth at the printed fare, buys at ₹850, receives a new QR boarding pass. |
+| **Buyer** | Priya Kumar (`priya@example.com`) | Searches Bangalore → Chennai for tonight's departures, sees the sold-out 22:30 coach with one relayed berth at the printed fare, buys at ₹850, receives a new QR boarding pass. |
 | **Operator** | SwiftBus Operations (`ops@swiftbus.in`) | Simulated GDS portal. Reviews side-by-side identity verification, clicks 1-Click Approve / Reject Reissue. |
 
 ---

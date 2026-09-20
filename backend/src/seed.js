@@ -6,6 +6,28 @@ function uuidv4() {
   return crypto.randomUUID();
 }
 
+/**
+ * Demo coaches always leave tonight, so the resale window is never in the past.
+ * Departures are wall-clock times at the boarding point (stored with a Z suffix).
+ * If the earliest departure is already inside the operator's cutoff, roll to tomorrow.
+ */
+function serviceDay() {
+  const now = new Date();
+  const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const earliest = new Date(base.getTime());
+  earliest.setUTCHours(20, 0, 0, 0);
+  if (now.getTime() > earliest.getTime() - 90 * 60 * 1000) base.setUTCDate(base.getUTCDate() + 1);
+  const day = base.toISOString().slice(0, 10);
+  const at = (dayOffset, hhmm) => {
+    const d = new Date(base.getTime());
+    d.setUTCDate(d.getUTCDate() + dayOffset);
+    const [h, m] = hhmm.split(':').map(Number);
+    d.setUTCHours(h, m, 0, 0);
+    return d.toISOString();
+  };
+  return { day, at };
+}
+
 async function seedData() {
   console.log('🌱 Seeding SeatRelay demo data into SQLite...');
 
@@ -14,6 +36,8 @@ async function seedData() {
   const priyaId = 'usr_priya_kumar_2';
   const operatorUserId = 'usr_swiftbus_ops_3';
   const now = new Date().toISOString();
+  const { day, at } = serviceDay();
+  const departureLabel = `${new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}, 10:30 PM`;
 
   // Secure password hashing with PBKDF2
   function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -45,7 +69,7 @@ async function seedData() {
   `, [operatorId, now]);
 
   // 3. Buses
-  // Primary Bus: Bangalore -> Chennai, 19 Sep 2026, 10:30 PM (SOLD OUT with U12 belonging to Rahul)
+  // Primary Bus: Bangalore -> Chennai, tonight at 10:30 PM (SOLD OUT with U12 belonging to Rahul)
   const bus1Id = 'bus_bangalore_chennai_1030pm';
   const bus2Id = 'bus_bangalore_chennai_0900pm';
   const bus3Id = 'bus_bangalore_chennai_1115pm';
@@ -55,17 +79,17 @@ async function seedData() {
   DatabaseService.run(`
     INSERT OR REPLACE INTO buses (id, operatorId, busNumber, busType, routeFrom, routeTo, departureTime, arrivalTime, travelDate, baseFare, createdAt)
     VALUES 
-      (?, ?, 'KA-01-F-8899', 'AC Sleeper (2+1) Multi-Axle', 'Bangalore', 'Chennai', '2026-09-19T22:30:00.000Z', '2026-09-20T06:30:00.000Z', '2026-09-19', 850.0, ?),
-      (?, ?, 'KA-01-F-9911', 'Volvo AC Semi-Sleeper (2+2)', 'Bangalore', 'Chennai', '2026-09-19T21:00:00.000Z', '2026-09-20T05:00:00.000Z', '2026-09-19', 750.0, ?),
-      (?, ?, 'KA-01-F-3344', 'Scania High-Deck AC Sleeper', 'Bangalore', 'Chennai', '2026-09-19T23:15:00.000Z', '2026-09-20T07:00:00.000Z', '2026-09-19', 950.0, ?),
-      (?, ?, 'MH-12-Q-4521', 'Mercedes Multi-Axle Sleeper', 'Mumbai', 'Pune', '2026-09-19T20:00:00.000Z', '2026-09-19T23:30:00.000Z', '2026-09-19', 550.0, ?),
-      (?, ?, 'DL-01-A-7788', 'Volvo B11R Luxury Coach', 'Delhi', 'Jaipur', '2026-09-19T21:30:00.000Z', '2026-09-20T03:30:00.000Z', '2026-09-19', 650.0, ?)
+      (?, ?, 'KA-01-F-8899', 'AC Sleeper (2+1) Multi-Axle', 'Bangalore', 'Chennai', ?, ?, ?, 850.0, ?),
+      (?, ?, 'KA-01-F-9911', 'Volvo AC Semi-Sleeper (2+2)', 'Bangalore', 'Chennai', ?, ?, ?, 750.0, ?),
+      (?, ?, 'KA-01-F-3344', 'Scania High-Deck AC Sleeper', 'Bangalore', 'Chennai', ?, ?, ?, 950.0, ?),
+      (?, ?, 'MH-12-Q-4521', 'Mercedes Multi-Axle Sleeper', 'Mumbai', 'Pune', ?, ?, ?, 550.0, ?),
+      (?, ?, 'DL-01-A-7788', 'Volvo B11R Luxury Coach', 'Delhi', 'Jaipur', ?, ?, ?, 650.0, ?)
   `, [
-    bus1Id, operatorId, now,
-    bus2Id, operatorId, now,
-    bus3Id, operatorId, now,
-    bus4Id, operatorId, now,
-    bus5Id, operatorId, now
+    bus1Id, operatorId, at(0, '22:30'), at(1, '06:30'), day, now,
+    bus2Id, operatorId, at(0, '21:00'), at(1, '05:00'), day, now,
+    bus3Id, operatorId, at(0, '23:15'), at(1, '07:00'), day, now,
+    bus4Id, operatorId, at(0, '20:00'), at(0, '23:30'), day, now,
+    bus5Id, operatorId, at(0, '21:30'), at(1, '03:30'), day, now
   ]);
 
   // 4. Seats for Bus 1
@@ -148,8 +172,8 @@ async function seedData() {
   // Initial welcome notification
   DatabaseService.run(`
     INSERT OR REPLACE INTO notifications (id, userId, title, message, type, isRead, createdAt)
-    VALUES (?, ?, 'Booking Confirmed: Bangalore → Chennai', 'Your ticket SB-92831 for SwiftBus on 19 Sep 2026, 10:30 PM (Seat U12) is confirmed.', 'SUCCESS', 0, ?)
-  `, [uuidv4(), rahulId, now]);
+    VALUES (?, ?, 'Booking Confirmed: Bangalore → Chennai', ?, 'SUCCESS', 0, ?)
+  `, [uuidv4(), rahulId, `Your ticket SB-92831 for SwiftBus on ${departureLabel} (Seat U12) is confirmed.`, now]);
 
   console.log('✅ Demo Seed Complete:');
   console.log(`- Rahul Sharma: Ticket SB-92831 (Bangalore → Chennai, Seat U12, ₹850)`);

@@ -18,7 +18,7 @@ type Filter = 'all' | 'resale_only' | 'direct_only';
 export const SearchBuses: React.FC<SearchBusesProps> = ({ buses, isLoading, onSearch, onSelectResaleSeat, initial }) => {
   const [fromCity, setFromCity] = useState(initial?.from ?? 'Bangalore');
   const [toCity, setToCity] = useState(initial?.to ?? 'Chennai');
-  const [travelDate, setTravelDate] = useState(initial?.date ?? '2026-09-19');
+  const [travelDate, setTravelDate] = useState(initial?.date || new Date().toISOString().slice(0, 10));
   const [query, setQuery] = useState({ from: fromCity, to: toCity, date: travelDate });
   const [activeFilter, setActiveFilter] = useState<Filter>('all');
   const [swapTurn, setSwapTurn] = useState(0);

@@ -280,17 +280,6 @@ docs/screenshots/      the images in this README
 DEPLOY_AWS.md          AWS deployment guide
 ```
 
----
-
-## Team & AI disclosure
-
-Per hackathon guidelines:
-
-- **Google Antigravity Agentic Assistant** — fullstack architecture, React component synthesis, workflow state-machine modelling, e-Rupee settlement engine, documentation.
-- **Claude Code (Anthropic)** — solution design review, frontend redesign (design system, light/dark themes, motion, all screens), AWS deployment tooling, and this README.
-
----
-
 <div align="center">
 
 **Nobody loses the fare. Nobody misses the bus. Everyone on board is on the record.**

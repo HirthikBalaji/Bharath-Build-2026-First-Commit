@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const QRCode = require('qrcode');
 const { DatabaseService } = require('./db');
 const { CBDCEscrowService } = require('./cbdc.service');
 const {
@@ -10,6 +11,10 @@ const {
 } = require('./workflow');
 const crypto = require('crypto');
 const { seedData } = require('./seed');
+
+function uuidv4() {
+  return crypto.randomUUID();
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seatrelay-jwt-prod-secret-982155';
 
@@ -759,12 +764,25 @@ app.delete('/api/operator/buses/:id', requireOperator, (req, res) => {
 // Book a direct ticket from zero for a passenger (real production flow)
 app.post('/api/tickets/book-direct', requireAuth, async (req, res) => {
   try {
-    const { busId, seatId, passengerName, passengerAge, passengerGender, phone, govIdType, govIdNumber } = req.body;
-    if (!busId || !seatId || !passengerName || !phone) {
+    const { busId, seatId, seatNumber, passengerName, passengerAge, passengerGender, phone, govIdType, govIdNumber } = req.body;
+    if (!busId || (!seatId && !seatNumber) || !passengerName || !phone) {
       return res.status(400).json({ error: 'Bus, seat, passenger name, and phone are required' });
     }
 
-    const seat = DatabaseService.get(`SELECT * FROM seats WHERE id = ? AND busId = ?`, [seatId, busId]);
+    let seat = null;
+    if (seatId) {
+      seat = DatabaseService.get(`SELECT * FROM seats WHERE id = ? AND busId = ?`, [seatId, busId]);
+    }
+    if (!seat && seatNumber) {
+      seat = DatabaseService.get(`SELECT * FROM seats WHERE seatNumber = ? AND busId = ?`, [seatNumber, busId]);
+    }
+    if (!seat && seatId) {
+      // Also try matching seatNumber from seatId suffix if formatted like seat_<busId>_<seatNumber>
+      const parts = seatId.split('_');
+      const possibleNum = parts[parts.length - 1];
+      seat = DatabaseService.get(`SELECT * FROM seats WHERE seatNumber = ? AND busId = ?`, [possibleNum, busId]);
+    }
+
     if (!seat) return res.status(404).json({ error: 'Seat not found on this coach' });
     if (seat.status !== 'AVAILABLE') return res.status(409).json({ error: 'Seat is no longer available' });
 
@@ -794,7 +812,7 @@ app.post('/api/tickets/book-direct', requireAuth, async (req, res) => {
     DatabaseService.transaction([
       {
         sql: `UPDATE seats SET status = 'BOOKED' WHERE id = ?`,
-        params: [seatId]
+        params: [seat.id]
       },
       {
         sql: `INSERT INTO tickets (
@@ -803,7 +821,7 @@ app.post('/api/tickets/book-direct', requireAuth, async (req, res) => {
                 govIdType, govIdNumber, fare, status, qrCode, issuedAt, updatedAt
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?, ?, ?)`,
         params: [
-          ticketId, ticketNumber, req.auth.userId, busId, seatId,
+          ticketId, ticketNumber, req.auth.userId, busId, seat.id,
           passengerName, Number(passengerAge || 25), passengerGender || 'Other', phone,
           govIdType || 'Aadhaar Card', govIdNumber || 'XXXX', bus.baseFare, qrCodeUrl, nowIso, nowIso
         ]

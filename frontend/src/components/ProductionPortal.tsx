@@ -229,13 +229,14 @@ export const ProductionPortal: React.FC<ProductionPortalProps> = ({
     setErrorMessage(null);
     try {
       // Find seat id
-      const seatId = `seat_${selectedBusForDirect.id}_${selectedSeatNumber}`;
+      const seatId = directSeats.find((s: any) => s.seatNumber === selectedSeatNumber)?.id || `seat_${selectedBusForDirect.id}_${selectedSeatNumber}`;
       const res = await fetch('/api/tickets/book-direct', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           busId: selectedBusForDirect.id,
           seatId,
+          seatNumber: selectedSeatNumber,
           passengerName: directPassengerName || currentUser.name,
           passengerAge: directPassengerAge,
           passengerGender: directPassengerGender,

@@ -226,11 +226,29 @@ function Shell() {
   };
 
   const fetchReissues = async () => {
+    // Only call operator endpoint if user has operator role to prevent 401/403 console errors
+    const token = localStorage.getItem('seatrelay_token');
+    const savedUser = localStorage.getItem('seatrelay_user');
+    let isOp = currentUser?.role === 'operator';
+    if (!isOp && savedUser) {
+      try {
+        isOp = JSON.parse(savedUser).role === 'operator';
+      } catch (e) {}
+    }
+    if (!isOp && !token) {
+      setReissues([]);
+      return;
+    }
+
     setIsReissuesLoading(true);
     try {
       const res = await fetch('/api/operator/reissues', {
         headers: getAuthHeaders(),
       });
+      if (res.status === 401 || res.status === 403) {
+        setReissues([]);
+        return;
+      }
       const data = await res.json();
       setReissues(Array.isArray(data) ? data : []);
     } catch (e) {

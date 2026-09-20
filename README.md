@@ -9,12 +9,12 @@
 *Your seat doesn't have to go to waste.*
 
 [![Built for First Commit](https://img.shields.io/badge/First%20Commit-Bharat%20Builds%20Tour-0B3B2E?style=for-the-badge)](https://wemakedevs.org)
-[![Deployed on AWS](https://img.shields.io/badge/Deployed%20on-AWS%20EC2-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)](DEPLOY_AWS.md)
+[![AWS CloudFront HTTPS](https://img.shields.io/badge/AWS%20CloudFront-HTTPS%20Live-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white)](https://d3ae1u9o1bbuui.cloudfront.net/)
 [![RBI e-Rupee](https://img.shields.io/badge/RBI%20e--Rupee-Programmable%20Escrow-1B4D3E?style=for-the-badge)](#-money-that-moves-in-milliseconds-rbi-e-rupee-escrow)
 [![React](https://img.shields.io/badge/React%2018-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev)
 [![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org)
 
-**[Live demo](#) · [Watch the 3-minute walkthrough](#-demo-video) · [Deploy it yourself](DEPLOY_AWS.md)**
+**[Live Demo (HTTPS)](https://d3ae1u9o1bbuui.cloudfront.net/) · [Watch the 3-minute walkthrough](#-demo-video) · [Deploy it yourself](DEPLOY_AWS.md)**
 
 </div>
 

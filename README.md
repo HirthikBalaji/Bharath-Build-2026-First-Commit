@@ -44,7 +44,7 @@ Fees come out of money the seller would otherwise have lost entirely — never a
 
 ## 📽 Demo video
 
-> **▶️ [Watch the 3-minute walkthrough](#)** — *replace this link with your recording*
+> **▶️ [Watch the 3-minute walkthrough](#)** 
 
 <!--
   To embed: drag your recording into a GitHub issue to get a user-images URL,

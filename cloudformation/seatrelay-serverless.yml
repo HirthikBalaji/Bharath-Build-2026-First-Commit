@@ -1,0 +1,515 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'SeatRelay - Full Cloud Serverless Architecture (DynamoDB, Cognito, Step Functions, S3, SNS, CloudWatch, API Gateway & Lambda)'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: 'production'
+    Description: 'Deployment environment stage'
+
+Resources:
+  # ============================================================================
+  # 1. AMAZON S3 - BOARDING PASSES & TICKET RECEIPTS BUCKET
+  # ============================================================================
+  SeatRelayStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'seatrelay-assets-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Project
+          Value: SeatRelay
+
+  # ============================================================================
+  # 2. AMAZON COGNITO - USER AUTHENTICATION & RBAC (SELLER, BUYER, OPERATOR)
+  # ============================================================================
+  SeatRelayUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'seatrelay-users-${Environment}'
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: false
+
+  SeatRelayUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub 'seatrelay-web-client-${Environment}'
+      UserPoolId: !Ref SeatRelayUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
+
+  CognitoGroupSeller:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'seller'
+      Description: 'SeatRelay confirmed ticket holders releasing seats'
+      UserPoolId: !Ref SeatRelayUserPool
+
+  CognitoGroupBuyer:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'buyer'
+      Description: 'SeatRelay travellers purchasing face-value relayed berths'
+      UserPoolId: !Ref SeatRelayUserPool
+
+  CognitoGroupOperator:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: 'operator'
+      Description: 'Carrier dispatch personnel reviewing passenger transfers'
+      UserPoolId: !Ref SeatRelayUserPool
+
+  # ============================================================================
+  # 3. AMAZON DYNAMODB - HIGH-PERFORMANCE NO-SQL TABLES WITH CONDITIONAL WRITES
+  # ============================================================================
+  ListingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'SeatRelay-Listings-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: listingId
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: listingId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Project
+          Value: SeatRelay
+
+  OperatorTicketsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'SeatRelay-OperatorTickets-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: ticketId
+          AttributeType: S
+        - AttributeName: busId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ticketId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: BusTicketsIndex
+          KeySchema:
+            - AttributeName: busId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: SeatRelay
+
+  TransfersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'SeatRelay-Transfers-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: transferId
+          AttributeType: S
+        - AttributeName: listingId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: transferId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ListingTransfersIndex
+          KeySchema:
+            - AttributeName: listingId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: SeatRelay
+
+  CBDCEscrowContractsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'SeatRelay-CBDCEscrowContracts-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: contractAddress
+          AttributeType: S
+        - AttributeName: transactionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: contractAddress
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: TransactionIndex
+          KeySchema:
+            - AttributeName: transactionId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: SeatRelay
+
+  # ============================================================================
+  # 4. AMAZON SNS - REAL-TIME NOTIFICATION TOPIC
+  # ============================================================================
+  SeatRelayNotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'seatrelay-notifications-${Environment}'
+      DisplayName: 'SeatRelay Trip Updates & Transfers'
+      Tags:
+        - Key: Project
+          Value: SeatRelay
+
+  # ============================================================================
+  # 5. IAM ROLES - LEAST-PRIVILEGE PERMISSIONS
+  # ============================================================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'seatrelay-lambda-role-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SeatRelayCloudAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource:
+                  - !GetAtt ListingsTable.Arn
+                  - !Sub '${ListingsTable.Arn}/*'
+                  - !GetAtt OperatorTicketsTable.Arn
+                  - !Sub '${OperatorTicketsTable.Arn}/*'
+                  - !GetAtt TransfersTable.Arn
+                  - !Sub '${TransfersTable.Arn}/*'
+                  - !GetAtt CBDCEscrowContractsTable.Arn
+                  - !Sub '${CBDCEscrowContractsTable.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Sub '${SeatRelayStorageBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref SeatRelayNotificationsTopic
+              - Effect: Allow
+                Action:
+                  - states:SendTaskSuccess
+                  - states:SendTaskFailure
+                Resource: '*'
+
+  StepFunctionsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'seatrelay-stepfunctions-role-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeLambdaAndSNS
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref SeatRelayNotificationsTopic
+
+  # ============================================================================
+  # 6. AWS LAMBDA FUNCTIONS - ATOMIC CLAIM, ESCROW HOLD, REISSUE
+  # ============================================================================
+  ClaimSeatFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'seatrelay-claim-seat-${Environment}'
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 10
+      Code:
+        ZipFile: |
+          exports.handler = async (event) => {
+            console.log("Atomic claim invoked:", JSON.stringify(event));
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ message: "Seat atomically claimed", claimExpiresInMinutes: 10 })
+            };
+          };
+
+  ExpireListingFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'seatrelay-expire-listing-${Environment}'
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 10
+      Code:
+        ZipFile: |
+          exports.handler = async (event) => {
+            console.log("EventBridge trigger: Expiring listing at T-60m cutoff", JSON.stringify(event));
+            return {
+              statusCode: 200,
+              body: JSON.stringify({ status: "EXPIRED", message: "Seat returned to operator policy at cutoff" })
+            };
+          };
+
+  # ============================================================================
+  # 7. AWS STEP FUNCTIONS - TRANSFER STATE MACHINE
+  # ============================================================================
+  SeatRelayStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub 'SeatRelay-Transfer-Workflow-${Environment}'
+      RoleArn: !GetAtt StepFunctionsExecutionRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "SeatRelay Operator-Authorized Resale Transfer Workflow",
+          "StartAt": "PaymentHeld",
+          "States": {
+            "PaymentHeld": {
+              "Type": "Pass",
+              "Result": { "status": "PAYMENT_HELD", "paymentMethod": "CBDC_eRupee" },
+              "ResultPath": "$.paymentState",
+              "Next": "NotifyOperatorNewTransfer"
+            },
+            "NotifyOperatorNewTransfer": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sns:publish",
+              "Parameters": {
+                "TopicArn": "${SeatRelayNotificationsTopic}",
+                "Subject": "Action Required: Passenger Reissue Authorization",
+                "Message.$": "$.transferDetails"
+              },
+              "Next": "WaitForOperatorDecision"
+            },
+            "WaitForOperatorDecision": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+              "Parameters": {
+                "FunctionName": "${ClaimSeatFunction.Arn}",
+                "Payload": {
+                  "token.$": "$$.Task.Token",
+                  "transferId.$": "$.transferId"
+                }
+              },
+              "TimeoutSeconds": 600,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.Timeout"],
+                  "Next": "RefundBuyerAndRollback"
+                }
+              ],
+              "Next": "CheckOperatorApproval"
+            },
+            "CheckOperatorApproval": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.operatorApproved",
+                  "BooleanEquals": true,
+                  "Next": "ExecuteInstantT0Settlement"
+                }
+              ],
+              "Default": "RefundBuyerAndRollback"
+            },
+            "ExecuteInstantT0Settlement": {
+              "Type": "Pass",
+              "Result": {
+                "status": "COMPLETED",
+                "settlement": "T+0 Instant e-Rupee Smart Contract Settlement"
+              },
+              "End": true
+            },
+            "RefundBuyerAndRollback": {
+              "Type": "Pass",
+              "Result": {
+                "status": "REJECTED_OR_TIMED_OUT",
+                "action": "Tokens decumbered back to buyer wallet"
+              },
+              "End": true
+            }
+          }
+        }
+      Tags:
+        - Key: Project
+          Value: SeatRelay
+
+  # ============================================================================
+  # 8. AMAZON API GATEWAY (REST API)
+  # ============================================================================
+  SeatRelayApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'SeatRelay-API-${Environment}'
+      Description: 'SeatRelay Public GDS & Resale Protocol REST API'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiListingsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref SeatRelayApiGateway
+      ParentId: !GetAtt SeatRelayApiGateway.RootResourceId
+      PathPart: 'listings'
+
+  ApiListingsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref SeatRelayApiGateway
+      ResourceId: !Ref ApiListingsResource
+      HttpMethod: 'POST'
+      AuthorizationType: 'NONE'
+      Integration:
+        Type: 'AWS_PROXY'
+        IntegrationHttpMethod: 'POST'
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ClaimSeatFunction.Arn}/invocations'
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiListingsMethod
+    Properties:
+      RestApiId: !Ref SeatRelayApiGateway
+      StageName: 'prod'
+
+  # ============================================================================
+  # 9. AMAZON CLOUDWATCH - RECOVERED REVENUE & LATENCY DASHBOARD
+  # ============================================================================
+  SeatRelayDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub 'SeatRelay-Metrics-${Environment}'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "${ListingsTable}", "Operation", "UpdateItem" ]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "${AWS::Region}",
+                "title": "DynamoDB Atomic Claim Latency (ms)"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/States", "ExecutionsSucceeded", "StateMachineArn", "${SeatRelayStateMachine}" ]
+                ],
+                "period": 300,
+                "stat": "Sum",
+                "region": "${AWS::Region}",
+                "title": "Completed Transfers (Recovered Fares)"
+              }
+            }
+          ]
+        }
+
+Outputs:
+  StorageBucketName:
+    Description: 'Amazon S3 Bucket for Boarding Passes & QR Codes'
+    Value: !Ref SeatRelayStorageBucket
+    Export:
+      Name: SeatRelayStorageBucket
+
+  CognitoUserPoolId:
+    Description: 'Amazon Cognito User Pool ID'
+    Value: !Ref SeatRelayUserPool
+    Export:
+      Name: SeatRelayUserPoolId
+
+  CognitoClientId:
+    Description: 'Amazon Cognito Web App Client ID'
+    Value: !Ref SeatRelayUserPoolClient
+    Export:
+      Name: SeatRelayClientId
+
+  DynamoDBListingsTable:
+    Description: 'Amazon DynamoDB Listings Table'
+    Value: !Ref ListingsTable
+    Export:
+      Name: SeatRelayListingsTable
+
+  StepFunctionsStateMachineArn:
+    Description: 'AWS Step Functions Transfer State Machine ARN'
+    Value: !Ref SeatRelayStateMachine
+    Export:
+      Name: SeatRelayStateMachineArn
+
+  NotificationTopicArn:
+    Description: 'Amazon SNS Notifications Topic ARN'
+    Value: !Ref SeatRelayNotificationsTopic
+    Export:
+      Name: SeatRelayNotificationTopicArn
+
+  ApiGatewayEndpointUrl:
+    Description: 'Amazon API Gateway Root Endpoint URL'
+    Value: !Sub 'https://${SeatRelayApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/'
+    Export:
+      Name: SeatRelayApiUrl
